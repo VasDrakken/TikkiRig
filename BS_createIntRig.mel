@@ -1,0 +1,461 @@
+/* ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+|   Script Name:    BS_createIntRig.mel;
+|   Procs:          local BS_getPositions (string,string,string);
+|                   local BS_mirrorSkels (string,int);
+|                   global BS_createIntRig;
+|
+|   Other scripts sourced: BS_listNodeNames.mel & BS_skelCreator.mel
+|   Procs used in sourced scripts: BS_listNodeNames(string);
+|                           BS_skelCreator (matrix[][], string, string, int, string, int);
+|
+|   Notes:
+|    This script contains procedures that create more skeletons to finalize the basic biped rig.
+|    Unlike the previous skeleton creation scrpt, skeletons are both created and parented in
+|    this scrpt. The scrpt returns is an array of all the nodes in the new hierarchy.
+|
+| ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ */
+
+  print "\n***************************************************************************\n";
+  print "BS_createIntRig scrpt started!\n";
+  print "-----------------------------------------------------------------------------\n";
+ // ******************************************************************************************
+ // load all local proc into memory for adding skeletons to biped!
+  print "All procs are loaded into memory... \n";
+ // ------------------------------------------------------------------------------------------
+ // Local proc mirrors joints & catches names using list selection:
+  proc string[] BS_mirrorSkels (string $sourceSkel, int $ik)
+  { // open proc
+    string $mirrorSkelNames[];
+    if ($ik == 1)
+    { // open if
+       mirrorJoint -myz -mb -sr "lf" "rt" $sourceSkel;
+      // List selected to store main joints in array:
+       string $mirrorIk[] = `ls -sl`;
+       pickWalk -d left;
+       select -hi;
+       string $mirrorJoints[] = `ls -sl`;
+       int $endJoint = size($mirrorJoints) - 2;
+       $mirrorSkelNames = {$mirrorJoints[0],$mirrorJoints[$endJoint],$mirrorIk[0]};
+      // Clear selected
+       select -cl;
+    } // close if
+    else
+    { // open else
+       mirrorJoint -myz -mb -sr "lf" "rt" $sourceSkel;
+      // List selected to store main joints in array:
+       select -hi;
+       string $mirrorJoints[] = `ls -sl`;
+       int $endJoint = size($mirrorJoints) - 1;
+       $mirrorSkelNames = {$mirrorJoints[0],$mirrorJoints[$endJoint]};
+      // clear selection:
+       select -cl;
+    } // close else
+    return $mirrorSkelNames;
+  } // close proc
+  print "local proc BS_mirrorSkels is now loaded into memory";
+ // ------------------------------------------------------------------------------------------
+ // Local proc use in creation int biped rig
+  proc BS_nodeMover (string $target, string $constrained[], int $orient, int $freeze)
+  { // open procedure Move nodes with constraints, then delete constraints:
+    string $node;
+    for ($node in $constrained)
+    { // open loop
+      string $tempCns[] = `pointConstraint -o 0 0 0 -w 1 -n "tempMvCns" $target $node`;
+      delete -cn $tempCns[0];
+      if ($orient == 1)
+      { // open if
+        string $tempCns[] = `orientConstraint -o 0 0 0 -w 1 -n "tempMvCns" $target $node`;
+        delete -cn $tempCns[0];
+      } // close if
+      else if ($freeze == 1) makeIdentity -a 1 -t 1 -r 1 -s 1 $node;
+    } // close loop
+  } // close procedure
+  print "local procedure BS_nodeMover is now loaded into memory. \n";
+ // ------------------------------------------------------------------------------------------
+ // Local procedure used in creating the int biped rig:
+  proc string[] BS_doubleGrouper (string $pfx, string $name, string $parent)
+  {
+    string $sfx = "_controlGroup";
+    string $groupTop = `group -n ($pfx + $name + "0" + $sfx) -em -p $parent`;
+    string $groupBot = `group -n ($pfx + $name + "1" + $sfx) -em -p $groupTop`;
+    string $returnGroups[] = {$groupTop,$groupBot};
+    return $returnGroups;
+  } // close procedure
+  print "local procedure BS_doubleGrouper is now loaded into memory.\n";
+ // -------------------------------------------------------------------------------------------
+ // Local procedure used inn creating the basic rig:
+  proc string[] BS_getChildJoint (string $parent)
+  {
+    select -r $parent;
+    pickWalk -d "down";
+    string $returnChild[] = `ls -sl`;
+    select -cl;
+    return $returnChild;
+  } // close procedure
+  print "local procedure BS_getChildJoint is now loaded into memory.\n";
+ // *******************************************************************************************
+ // Global proc to add skeletons to the basic rig:
+  global proc string[] BS_createIntRig ()
+  { // Open procedure BS_createIntRig Ends on Line 422
+    // get top node name from enviroment
+     string $topNode = `getenv "BS_TopNode"`;
+     string $rigName = `getenv "BS_RigName"`;
+    // source file containing global proc for reading .rig file
+     source BS_getNodeNames;
+    // run proc to get basic rig nodes names from file
+     string $basicRigNodes[] = BS_getNodeNames("basicRig");
+    // ----------------------------------------------------------------------------------------
+    // Start namespace option...
+    // Set namespace to top node Names:
+     string $nSpace = ($rigName + "Space");
+     if (`namespace -exists $nSpace`) namespace -set $nSpace;
+     else
+     {
+       $nSpace = `namespace -p ":" -add $nSpace`;
+       namespace -set $nSpace;
+       print ("Namespace had been set to: " + $nSpace + ":");
+     } // close conditional
+    // end namespace option.
+    // ----------------------------------------------------------------------------------------
+    // Source file containing global proc for main rig names:
+     source BS_listNodeNames;
+    // proc to load data from arrays
+     string $mainBindJoints[] = BS_listNodeNames ("mainBindJoints");
+     string $moreBindJoints[] = BS_listNodeNames ("moreBindJoints");
+    // ----------------------------------------------------------------------------------------
+    // Source file containing global proc for rig skeletons:
+     source BS_skelCreator;
+    // ----------------------------------------------------------------------------------------
+    // common vars
+     string $printSkelNames = " skeleton created with names: ";
+     string $pfx0 = "ct";
+     string $pfx1 = "lf";
+     string $pfx2 = "rt";
+    // ----------------------------------------------------------------------------------------
+    // Create forearm rig with radius and ulna
+    // get positional data for left Ulna joints
+     float $jtP0[] = `pointPosition ($basicRigNodes[81] + ".vtx[7]")`;
+     float $jtP1[] = `pointPosition ($basicRigNodes[81] + ".vtx[52]")`;
+     matrix $lfUlnaPos[2][3] = << $jtP0[0], $jtP0[1], $jtP0[2];
+                                  $jtP1[0], $jtP1[1], $jtP1[2] >>;
+    // run proc to create left Ulna Skeleton:
+     string $lfUlnaSkel[] = BS_skelCreator ($lfUlnaPos,$pfx1,$moreBindJoints[5],2,"yup",1,0);
+    // mirror Skeleton to create right Ulna skeleton
+     string $rtUlnaSkel[] = BS_mirrorSkels ($lfUlnaSkel[0],1);
+    // print names of main Ulna joints
+     print ($pfx1 + $moreBindJoints[5] + $printSkelNames);
+     print $lfUlnaSkel; print " \n";
+     print ($pfx2 + $moreBindJoints[5] + $printSkelNames);
+     print $rtUlnaSkel; print " \n";
+    // get postion data for left radius joints
+     float $jtP0[] = `pointPosition ($basicRigNodes[82] + ".vtx[27]")`;
+     float $jtP1[] = `pointPosition ($basicRigNodes[82] + ".vtx[0]")`;
+     matrix $lfRadiusPos[2][3] = << $jtP0[0], $jtP0[1], $jtP0[2];
+                                    $jtP1[0], $jtP1[1], $jtP1[2] >>;
+    // run proc to create left Radius Skeleton:
+     string $lfRadiusSkel[] = BS_skelCreator ($lfRadiusPos,$pfx1,$moreBindJoints[6],2,"yup",1,0);
+    // mirror Skeleton to create right Radius skeleton
+     string $rtRadiusSkel[] = BS_mirrorSkels ($lfRadiusSkel[0],1);
+    // print names of main Radius joints
+     print ($pfx1 + $moreBindJoints[6] + $printSkelNames);
+     print $lfRadiusSkel; print "\n";
+     print ($pfx2 + $moreBindJoints[6] + $printSkelNames);
+     print $rtRadiusSkel; print "\n";
+    // Create locators to point constrain the Ulna Ik
+     string $lfUlnaLoc[] = `spaceLocator -n ($pfx1 + "Ulna_locator")`;
+     string $rtUlnaLoc[] = `spaceLocator -n ($pfx2 + "Ulna_locator")`;
+    // Move Locators to the Ulna position:
+     string $moveTemp[] = {$lfUlnaLoc[0]};
+     BS_nodeMover ($lfUlnaSkel[2],$moveTemp,0,1);
+     string $moveTemp[] = {$rtUlnaLoc[0]};
+     BS_nodeMover ($rtUlnaSkel[2],$moveTemp,0,1);
+    // point constraint the Ulan Ik to locator
+     pointConstraint -n "lfUlna_ptConstraint" -mo -weight 1 $lfUlnaLoc[0] $lfUlnaSkel[2];
+     pointConstraint -n "rtUlna_ptConstraint" -mo -weight 1 $rtUlnaLoc[0] $rtUlnaSkel[2];
+    // Parent all nodes, including re-parenting poly bones
+     parent $lfUlnaSkel[0] $lfRadiusSkel[0] $lfUlnaSkel[2] $basicRigNodes[83];
+     parent $lfUlnaLoc[0] $lfRadiusSkel[2] $basicRigNodes[79];
+     parent $basicRigNodes[81] $lfUlnaSkel[0];
+     parent $basicRigNodes[82] $lfRadiusSkel[0];
+     parent $rtUlnaSkel[0] $rtRadiusSkel[0] $rtUlnaSkel[2] $basicRigNodes[120];
+     parent $rtUlnaLoc[0] $rtRadiusSkel[2] $basicRigNodes[116];
+     parent $basicRigNodes[118] $rtUlnaSkel[0];
+     parent $basicRigNodes[119] $rtRadiusSkel[0];
+     select -cl;
+    // ----------------------------------------------------------------------------------------
+    // Create finger for both hands
+    // ------------------------------------
+    // get position data for left Thumb joints
+     float $jtP0[] = `pointPosition ($basicRigNodes[56] + ".vtx[7]")`;
+     float $jtP1[] = `pointPosition ($basicRigNodes[56] + ".vtx[0]")`;
+     float $jtP2[] = `pointPosition ($basicRigNodes[55] + ".vtx[0]")`;
+     float $jtP3[] = `pointPosition ($basicRigNodes[54] + ".vtx[0]")`;
+     matrix $lfThumbPos[4][3] = << $jtP0[0], $jtP0[1], $jtP0[2];
+                                   $jtP1[0], $jtP1[1], $jtP1[2];
+                                   $jtP2[0], $jtP2[1], $jtP2[2];
+                                   $jtP3[0], $jtP3[1], $jtP3[2] >>;
+    // run proc to create left Thumb skel
+     string $lfThumbSkel[] = BS_skelCreator ($lfThumbPos,$pfx1,$mainBindJoints[11],4,"yup",0,1);
+    // mirror Skeleton to create right Thumb skeleton
+     string $rtThumbSkel[] = BS_mirrorSkels ($lfThumbSkel[0],0);
+    // print names of main Ulna joints
+     print ($pfx1 + $mainBindJoints[11] + $printSkelNames);
+     print $lfThumbSkel; print "\n";
+     print ($pfx2 + $mainBindJoints[11] + $printSkelNames);
+     print $rtThumbSkel; print "\n";
+    // Create group Pad nodes:
+     string $lfThumbPads[] = BS_doubleGrouper ($pfx1,"ThumbPad",$basicRigNodes[53]);
+     string $rtThumbPads[] = BS_doubleGrouper ($pfx2,"ThumbPad",$basicRigNodes[90]);
+    // Move groups tp root joint position
+     string $moveTemp[] = {$lfThumbPads[0]};
+     BS_nodeMover ($lfThumbSkel[0],$moveTemp,1,1);
+     string $moveTemp[] = {$rtThumbPads[0]};
+     BS_nodeMover ($rtThumbSkel[0],$moveTemp,1,1);
+    // parent root joint under group nodes
+     parent $lfThumbSkel[0] $lfThumbPads[1];
+     parent $rtThumbSkel[0] $rtThumbPads[1];
+    // parent poly bones under finger joints
+     parent $basicRigNodes[56] $lfThumbSkel[0];
+     string $childJoint[] = BS_getChildJoint ($lfThumbSkel[0]);
+     parent $basicRigNodes[55] $childJoint[0];
+     string $childJoint[] = BS_getChildJoint ($childJoint[0]);
+     parent $basicRigNodes[54] $childJoint[0];
+     parent $basicRigNodes[93] $rtThumbSkel[0];
+     string $childJoint[] = BS_getChildJoint ($rtThumbSkel[0]);
+     parent $basicRigNodes[92] $childJoint[0];
+     string $childJoint[] = BS_getChildJoint ($childJoint[0]);
+     parent $basicRigNodes[91] $childJoint[0];
+    // ------------------------------------
+    // get postion data for left index finger joints
+     float $jtP0[] = `pointPosition ($basicRigNodes[61] + ".vtx[17]")`;
+     float $jtP1[] = `pointPosition ($basicRigNodes[61] + ".vtx[0]")`;
+     float $jtP2[] = `pointPosition ($basicRigNodes[58] + ".vtx[0]")`;
+     float $jtP3[] = `pointPosition ($basicRigNodes[57] + ".vtx[0]")`;
+     float $jtP4[] = `pointPosition ($basicRigNodes[60] + ".vtx[0]")`;
+     matrix $lfIndexPos[5][3] = << $jtP0[0], $jtP0[1], $jtP0[2];
+                                   $jtP1[0], $jtP1[1], $jtP1[2];
+                                   $jtP2[0], $jtP2[1], $jtP2[2];
+                                   $jtP3[0], $jtP3[1], $jtP3[2];
+                                   $jtP4[0], $jtP4[1], $jtP4[2] >>;
+    // run proc to create left index finger joints
+     string $lfIndexSkel[] = BS_skelCreator ($lfIndexPos,$pfx1,$mainBindJoints[12],5,"yup",0,1);
+    // mirror Skeleton to create right Thumb skeleton
+     string $rtIndexSkel[] = BS_mirrorSkels ($lfIndexSkel[0],0);
+    // print names of main Ulna joints
+     print ($pfx1 + $mainBindJoints[12] + $printSkelNames);
+     print $lfIndexSkel; print "\n";
+     print ($pfx2 + $mainBindJoints[12] + $printSkelNames);
+     print $rtIndexSkel; print "\n";
+    // Create group Pad nodes:
+     string $lfIndexPads[] = BS_doubleGrouper ($pfx1,"IndexPad",$basicRigNodes[53]);
+     string $rtIndexPads[] = BS_doubleGrouper ($pfx2,"IndexPad",$basicRigNodes[90]);
+    // Move groups tp root joint position
+     string $moveTemp[] = {$lfIndexPads[0]};
+     BS_nodeMover ($lfIndexSkel[0],$moveTemp,1,1);
+     string $moveTemp[] = {$rtIndexPads[0]};
+     BS_nodeMover ($rtIndexSkel[0],$moveTemp,1,1);
+    // parent root joint under group nodes
+     parent $lfIndexSkel[0] $lfIndexPads[1];
+     parent $rtIndexSkel[0] $rtIndexPads[1];
+    // parent poly bones under finger joints
+     parent $basicRigNodes[61] $lfIndexSkel[0];
+     string $childJoint[] = BS_getChildJoint ($lfIndexSkel[0]);
+     parent $basicRigNodes[58] $childJoint[0];
+     string $childJoint[] = BS_getChildJoint ($childJoint[0]);
+     parent $basicRigNodes[57] $childJoint[0];
+     string $childJoint[] = BS_getChildJoint ($childJoint[0]);
+     parent $basicRigNodes[60] $childJoint[0];
+     parent $basicRigNodes[98] $rtIndexSkel[0];
+     string $childJoint[] = BS_getChildJoint ($rtIndexSkel[0]);
+     parent $basicRigNodes[95] $childJoint[0];
+     string $childJoint[] = BS_getChildJoint ($childJoint[0]);
+     parent $basicRigNodes[94] $childJoint[0];
+     string $childJoint[] = BS_getChildJoint ($childJoint[0]);
+     parent $basicRigNodes[97] $childJoint[0];
+    // ------------------------------------
+    // get postion data for left Middle finger joints
+     float $jtP0[] = `pointPosition ($basicRigNodes[63] + ".vtx[17]")`;
+     float $jtP1[] = `pointPosition ($basicRigNodes[63] + ".vtx[0]")`;
+     float $jtP2[] = `pointPosition ($basicRigNodes[67] + ".vtx[0]")`;
+     float $jtP3[] = `pointPosition ($basicRigNodes[68] + ".vtx[0]")`;
+     matrix $lfMiddlePos[4][3] = << $jtP0[0], $jtP0[1], $jtP0[2];
+                                   $jtP1[0], $jtP1[1], $jtP1[2];
+                                   $jtP2[0], $jtP2[1], $jtP2[2];
+                                   $jtP3[0], $jtP3[1], $jtP3[2] >>;
+    // run proc to create left Middle joints
+     string $lfMiddleSkel[] = BS_skelCreator ($lfMiddlePos,$pfx1,$mainBindJoints[13],4,"yup",0,1);
+    // mirror Skeleton to create right Thumb skeleton
+     string $rtMiddleSkel[] = BS_mirrorSkels ($lfMiddleSkel[0],0);
+    // print names of main Ulna joints
+     print ($pfx1 + $mainBindJoints[13] + $printSkelNames);
+     print $lfMiddleSkel; print "\n";
+     print ($pfx2 + $mainBindJoints[13] + $printSkelNames);
+     print $rtMiddleSkel; print "\n";
+    // Create group Pad nodes:
+     string $lfMiddlePads[] = BS_doubleGrouper ($pfx1,"MiddlePad",$basicRigNodes[53]);
+     string $rtMiddlePads[] = BS_doubleGrouper ($pfx2,"MiddlePad",$basicRigNodes[90]);
+    // Move groups tp root joint position
+     string $moveTemp[] = {$lfMiddlePads[0]};
+     BS_nodeMover ($lfMiddleSkel[0],$moveTemp,1,1);
+     string $moveTemp[] = {$rtMiddlePads[0]};
+     BS_nodeMover ($rtMiddleSkel[0],$moveTemp,1,1);
+    // parent root joint under group nodes
+     parent $lfMiddleSkel[0] $lfMiddlePads[1];
+     parent $rtMiddleSkel[0] $rtMiddlePads[1];
+    // parent poly bones under finger joints
+     parent $basicRigNodes[63] $lfMiddleSkel[0];
+     string $childJoint[] = BS_getChildJoint ($lfMiddleSkel[0]);
+     parent $basicRigNodes[67] $childJoint[0];
+     string $childJoint[] = BS_getChildJoint ($childJoint[0]);
+     parent $basicRigNodes[68] $childJoint[0];
+     parent $basicRigNodes[100] $rtMiddleSkel[0];
+     string $childJoint[] = BS_getChildJoint ($rtMiddleSkel[0]);
+     parent $basicRigNodes[104] $childJoint[0];
+     string $childJoint[] = BS_getChildJoint ($childJoint[0]);
+     parent $basicRigNodes[105] $childJoint[0];
+    // ------------------------------------
+    // get postion data for left Ring finger joints
+     float $jtP0[] = `pointPosition ($basicRigNodes[62] + ".vtx[17]")`;
+     float $jtP1[] = `pointPosition ($basicRigNodes[62] + ".vtx[0]")`;
+     float $jtP2[] = `pointPosition ($basicRigNodes[64] + ".vtx[0]")`;
+     float $jtP3[] = `pointPosition ($basicRigNodes[69] + ".vtx[0]")`;
+     float $jtP4[] = `pointPosition ($basicRigNodes[71] + ".vtx[0]")`;
+     matrix $lfRingPos[5][3] = << $jtP0[0], $jtP0[1], $jtP0[2];
+                                  $jtP1[0], $jtP1[1], $jtP1[2];
+                                  $jtP2[0], $jtP2[1], $jtP2[2];
+                                  $jtP3[0], $jtP3[1], $jtP3[2];
+                                  $jtP4[0], $jtP4[1], $jtP4[2] >>;
+    // run proc to create left Ring joints
+     string $lfRingSkel[] = BS_skelCreator ($lfRingPos,$pfx1,$mainBindJoints[14],5,"yup",0,1);
+    // mirror Skeleton to create right Thumb skeleton
+     string $rtRingSkel[] = BS_mirrorSkels ($lfRingSkel[0],0);
+    // print names of main Ulna joints
+     print ($pfx1 + $mainBindJoints[14] + $printSkelNames);
+     print $lfRingSkel; print "\n";
+     print ($pfx2 + $mainBindJoints[14] + $printSkelNames);
+     print $rtRingSkel; print "\n";
+    // Create group Pad nodes:
+     string $lfRingPads[] = BS_doubleGrouper ($pfx1,"RingPad",$basicRigNodes[53]);
+     string $rtRingPads[] = BS_doubleGrouper ($pfx2,"RingPad",$basicRigNodes[90]);
+    // Move groups tp root joint position
+     string $moveTemp[] = {$lfRingPads[0]};
+     BS_nodeMover ($lfRingSkel[0],$moveTemp,1,1);
+     string $moveTemp[] = {$rtRingPads[0]};
+     BS_nodeMover ($rtRingSkel[0],$moveTemp,1,1);
+    // parent root joint under group nodes
+     parent $lfRingSkel[0] $lfRingPads[1];
+     parent $rtRingSkel[0] $rtRingPads[1];
+    // parent poly bones under finger joints
+     parent $basicRigNodes[62] $lfRingSkel[0];
+     string $childJoint[] = BS_getChildJoint ($lfRingSkel[0]);
+     parent $basicRigNodes[64] $childJoint[0];
+     string $childJoint[] = BS_getChildJoint ($childJoint[0]);
+     parent $basicRigNodes[69] $childJoint[0];
+     string $childJoint[] = BS_getChildJoint ($childJoint[0]);
+     parent $basicRigNodes[71] $childJoint[0];
+     parent $basicRigNodes[99] $rtRingSkel[0];
+     string $childJoint[] = BS_getChildJoint ($rtRingSkel[0]);
+     parent $basicRigNodes[101] $childJoint[0];
+     string $childJoint[] = BS_getChildJoint ($childJoint[0]);
+     parent $basicRigNodes[106] $childJoint[0];
+     string $childJoint[] = BS_getChildJoint ($childJoint[0]);
+     parent $basicRigNodes[108] $childJoint[0];
+    // ------------------------------------
+    // get postion data for left Pinky finger joints
+     float $jtP0[] = `pointPosition ($basicRigNodes[65] + ".vtx[17]")`;
+     float $jtP1[] = `pointPosition ($basicRigNodes[65] + ".vtx[0]")`;
+     float $jtP2[] = `pointPosition ($basicRigNodes[66] + ".vtx[0]")`;
+     float $jtP3[] = `pointPosition ($basicRigNodes[70] + ".vtx[0]")`;
+     float $jtP4[] = `pointPosition ($basicRigNodes[72] + ".vtx[0]")`;
+     matrix $lfPinkyPos[5][3] = << $jtP0[0], $jtP0[1], $jtP0[2];
+                                  $jtP1[0], $jtP1[1], $jtP1[2];
+                                  $jtP2[0], $jtP2[1], $jtP2[2];
+                                  $jtP3[0], $jtP3[1], $jtP3[2];
+                                  $jtP4[0], $jtP4[1], $jtP4[2] >>;
+    // run proc to create left Ring joints
+     string $lfPinkySkel[] = BS_skelCreator ($lfPinkyPos,$pfx1,$mainBindJoints[15],5,"yup",0,1);
+    // mirror Skeleton to create right Thumb skeleton
+     string $rtPinkySkel[] = BS_mirrorSkels ($lfPinkySkel[0],0);
+    // print names of main Ulna joints
+     print ($pfx1 + $mainBindJoints[15] + $printSkelNames);
+     print $lfPinkySkel; print "\n";
+     print ($pfx2 + $mainBindJoints[15] + $printSkelNames);
+     print $rtPinkySkel; print "\n";
+    // Create group Pad nodes:
+     string $lfPinkyPads[] = BS_doubleGrouper ($pfx1,"PinkyPad",$basicRigNodes[53]);
+     string $rtPinkyPads[] = BS_doubleGrouper ($pfx2,"PinkyPad",$basicRigNodes[90]);
+    // Move groups tp root joint position
+     string $moveTemp[] = {$lfPinkyPads[0]};
+     BS_nodeMover ($lfPinkySkel[0],$moveTemp,1,1);
+     string $moveTemp[] = {$rtPinkyPads[0]};
+     BS_nodeMover ($rtPinkySkel[0],$moveTemp,1,1);
+    // parent root joint under group nodes
+     parent $lfPinkySkel[0] $lfPinkyPads[1];
+     parent $rtPinkySkel[0] $rtPinkyPads[1];
+    // parent poly bones under finger joints
+     parent $basicRigNodes[65] $lfPinkySkel[0];
+     string $childJoint[] = BS_getChildJoint ($lfPinkySkel[0]);
+     parent $basicRigNodes[66] $childJoint[0];
+     string $childJoint[] = BS_getChildJoint ($childJoint[0]);
+     parent $basicRigNodes[70] $childJoint[0];
+     string $childJoint[] = BS_getChildJoint ($childJoint[0]);
+     parent $basicRigNodes[72] $childJoint[0];
+     parent $basicRigNodes[102] $rtPinkySkel[0];
+     string $childJoint[] = BS_getChildJoint ($rtPinkySkel[0]);
+     parent $basicRigNodes[103] $childJoint[0];
+     string $childJoint[] = BS_getChildJoint ($childJoint[0]);
+     parent $basicRigNodes[107] $childJoint[0];
+     string $childJoint[] = BS_getChildJoint ($childJoint[0]);
+     parent $basicRigNodes[109] $childJoint[0];
+    // clear select
+     select -cl;
+    // Set namespace to root
+     namespace -set ":";
+     print ("Namespace has been set back to root (:) \n");
+    // ----------------------------------------------------------------------------------------
+    // List all node paths in the rig hierarchy
+     string $intRigNodes[] = `listRelatives -ad -typ "transform" $topNode`;
+    /* start return array..
+     []
+       end return array */
+     return $intRigNodes;
+  } // close procedure BS_createIntRig Starts on Line 99
+ // *******************************************************************************************
+  print "global proc BS_createIntRig now loaded into memory. \n";
+ // *******************************************************************************************
+ // Run all procs to create the intermediate rig
+  string $intRigNodes[] = BS_createIntRig ();
+  print "BS Intermediate Rig biped rig created! \n ";
+  print "--------------------------------------------------------------\n";
+  print "BS_createIntRig proc returns rig Hierarchy:  \n";
+  print "**************************************************************\n";
+ // ----------------------------------------------------------------------------------------
+ // get rig name from enviroment
+  string $rigName = `getenv "BS_RigName"`;
+  string $filePath = `getenv "BS_FilePath"`;
+ // Write return value to file:
+  string $intRigFile = ($filePath + $rigName + "_intRig.rig");
+ // Write .rig file:
+  int $fileId = `fopen $intRigFile "w"`;
+ // Use loop to print array positions and contents:
+  int $i;
+  for ($i = 0; $i < size($intRigNodes); $i++)
+  { // open loop
+    // Print to cmd !Note removing namespacing for printing
+     string $buffer[];
+     tokenize $intRigNodes[$i] ":" $buffer;
+     print ("[" + $i + "]" + $buffer[1] + "\n");
+    // Print to file:
+     fprint $fileId ($intRigNodes[$i] + "\n");
+  } // close loop
+  fclose $fileId;
+ // ----------------------------------------------------------------------------------------
+ // Edit to enable the advanced rig button in GUI
+  button -e -vis 0 "BS_advancedRigButton";
+  button -e -en 1 -vis 1 -bgc 0.0 1.0 0.0 "BS_advancedRigButton";
+  button -e -l "Done" -en 0 "BS_intermRigButton";
+ // ****************************************************************************************
+  print "-----------------------------------------------------------------------------------\n";
+  print "BS_createIntRig scrpt done! \n";
+  print "***********************************************************************************\n \n";
+  // EOF

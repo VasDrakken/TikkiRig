@@ -1,0 +1,662 @@
+/* ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+|   Script Name:    BS_createBasicRig.mel;
+|   Procs:          local BS_rigParentor (string, string, int);
+|                   local BS_nodeMover (string, string[], int, int);
+|                   local BS_doubleGrouper (string, string, string);
+|                   local BS_getChildJoint (string);
+|                   global BS_createBasicRig (string, string[], string[]);
+|
+|   Other scripts sourced: BS_listNodeNames.mel & BS_createIcons.mel & BS_createMainSkels.mel
+|   Procs used in sourced scripts: BS_listNodeNames(string); BS_createMainSkels();
+|                                  BS_createIcons(string[]);
+|
+|   Notes:
+|    This script contains procedures that create the basic biped rig. Skeletons, control icons
+|    and control grouups must be created and parented. The scrpt returns the node names.
+|
+| ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ */
+
+ print " \n";
+ print "************************************************************************\n";
+ print "BS_createBasicRig script started";
+ print "------------------------------------------------------------------------\n";
+ // -------------------------------------------------------------------------------------------
+ print "procedures being loaded into memory...\n";
+ // Local procedure used in creating the basic rig:
+  proc string[] BS_rigParentor (string $parent, string $children[], int $freeze)
+  { // open procedure
+    string $names[];
+    string $child;
+    for ($child in $children)
+    {
+      string $name[] = `parent $child $parent`;
+      $names[ size($names)] = $name[0];
+      if ($freeze == 1) makeIdentity -a 1 -t 1 -r 1 -s 1 $child;
+    } //close loop
+    return $names;
+  } // close procedure
+  print "local procedure BS_rigParentor is now loaded into memory.\n";
+ // -------------------------------------------------------------------------------------------
+ // Local procedure used inn creating the basic rig:
+  proc BS_nodeMover (string $target, string $constrained[], int $orient, int $freeze)
+  { // moves nodes with constraints, the removes constraints:
+    string $node;
+    for ($node in $constrained)
+    {
+      string $tempCns[] = `pointConstraint -o 0 0 0 -w 1 -n "tempMvCns" $target $node`;
+      delete -cn $tempCns[0];
+      if ($orient == 1)
+      {
+        string $tempCns[] = `orientConstraint -o 0 0 0 -w 1 -n "tempMvCns" $target $node`;
+        delete -cn $tempCns[0];
+      } // close conditional
+    else if ($freeze == 1) makeIdentity -a 1 -t 1 -r 1 -s 1 $node;
+    } // close loop
+  } //close procedure.
+  print "local procedure BS_nodeMover is now loaded into memory.\n";
+ // -------------------------------------------------------------------------------------------
+ // Local procedure used inn creating the basic rig:
+  proc string[] BS_doubleGrouper (string $pfx, string $name, string $parent)
+  {
+    string $sfx = "_controlGroup";
+    string $groupTop = `group -n ($pfx + $name + "0" + $sfx) -em -p $parent`;
+    string $groupBot = `group -n ($pfx + $name + "1" + $sfx) -em -p $groupTop`;
+    string $returnGroups[] = {$groupTop,$groupBot};
+    return $returnGroups;
+  } // close procedure
+  print "local procedure BS_doubleGrouper is now loaded into memory.\n";
+ // -------------------------------------------------------------------------------------------
+ // Local procedure used inn creating the basic rig:
+  proc string[] BS_getChildJoint (string $parent)
+  {
+    select -r $parent;
+    pickWalk -d "down";
+    string $returnChild[] = `ls -sl`;
+    select -cl;
+    return $returnChild;
+  } // close procedure
+  print "local procedure BS_getChildJoint is now loaded into memory.\n";
+ // *******************************************************************************************
+ // Create the basic rig hierarchy:
+ // Global proc to create the basic rig:
+  global proc string[] BS_createBasicRig ()
+  { // Open procedure BS_createBasicRig ends on line 406
+     string $topNode = `getenv "BS_TopNode"`;
+     string $rigName = `getenv "BS_RigName"`;
+    // ----------------------------------------------------------------------------------------
+    // Start namespace option...
+    // Set namespace to top node Names:
+     string $nSpace = ($rigName + "Space");
+     if (`namespace -exists $nSpace`) namespace -set $nSpace;
+     else
+     {
+       $nSpace = `namespace -p ":" -add $nSpace`;
+       namespace -set $nSpace;
+       print ("Namespace had been set to: " + $nSpace + ":");
+     } // close conditional
+    // end namespace option.
+    // ----------------------------------------------------------------------------------------
+    // Source file for main rig global proc and create main skeletins and icons for basic rig
+     source BS_createMainSkels;
+     print "Running BS_createMainSkels to create the basic biped rig!\n";
+     print "---------------------------------------------------------\n";
+    // run proc to create nodes for basic rig
+     string $skelNodeNames[] = BS_createMainSkels();
+     print "main skeletons in BS basic biped rig now created\n";
+     print "----------------------------------------------------------\n";
+     print "BS_createMainSkels returns these node names: \n";
+    // Names printed from array via loop function:
+     int $i;
+     for ($i = 0; $i < size($skelNodeNames); $i++)
+     {
+       string $arrayPosition = $i;
+       print ("[" + $arrayPosition + "]" + $skelNodeNames[$i] + "\n");
+     } // close loop
+     print "*********************************************************\n";
+    // ----------------------------------------------------------------------------------------
+    // Source file containing global proc for creating icons:
+     source BS_createIcons;
+    // proc to create icons and return node names:
+     print "Running BS_createIcons creating icons\n";
+     print "---------------------------------------------------------\n";
+     string $controlIconNames[] = BS_createIcons($skelNodeNames);
+     print "icons for BS Basic Biped rig are created\n";
+     print "---------------------------------------------------------\n";
+     print "BS_createIcons returns these node names: \n";
+    // Names printed from array via loop function:
+     int $i;
+     for ($i = 0; $i < size($controlIconNames); $i++)
+     {
+       string $arrayPosition = $i;
+       print ("[" + $arrayPosition + "]" + $controlIconNames[$i] + "\n");
+     } // close loop
+     print "*********************************************************\n";
+    // ----------------------------------------------------------------------------------------
+    // Source file containing global proc for main rig names:
+     source BS_listNodeNames;
+    // proc to load data from arrays
+     string $controlGroups[] = BS_listNodeNames ("controlGroups");
+     string $legPolySkels[] = BS_listNodeNames ("legPolySkels");
+     string $torsoPolySkels[] = BS_listNodeNames ("torsoPolySkels");
+     string $backPolySkels[] = BS_listNodeNames ("backPolySkels");
+     string $armPolySkels[] = BS_listNodeNames ("armPolySkels");
+     string $handPolySkels[] = BS_listNodeNames ("handPolySkels");
+     string $moreFkRigNodes[] = BS_listNodeNames ("moreFkRigNodes");
+    // ----------------------------------------------------------------------------------------
+    // common vars
+     string $pfx0 = "ct";
+     string $pfx1 = "lf";
+     string $pfx2 = "rt";
+     string $sfxGroup = "_controlGroup";
+     string $sfxPoly = "_polySkel";
+     string $sfxFkRig = "_fkRig";
+     string $sfxFkGp = "_fkGroup";
+    // ----------------------------------------------------------------------------------------
+    // Parent lf foot poly bones under maya joints
+     parent ($pfx1 + $legPolySkels[2] + $sfxPoly) $skelNodeNames[0];
+     string $childJointTmp[] = BS_getChildJoint ($skelNodeNames[0]);
+     parent ($pfx1 + $legPolySkels[3] + $sfxPoly) $childJointTmp[0];
+     rename $childJointTmp[0] "lfFootBall_bindJoint";
+    // Parent rt foot poly bones under maya joints
+     parent ($pfx2 + $legPolySkels[2] + $sfxPoly) $skelNodeNames[2];
+     string $childJointTmp[] = BS_getChildJoint ($skelNodeNames[2]);
+     parent ($pfx2 + $legPolySkels[3] + $sfxPoly) $childJointTmp[0];
+     rename $childJointTmp[0] "rtFootBall_bindJoint";
+    // Parent lf leg poly bones under maya joints
+     parent ($pfx1 + $legPolySkels[0] + $sfxPoly) $skelNodeNames[4];
+     string $childJointTmp[] = BS_getChildJoint ($skelNodeNames[4]);
+     parent ($pfx1 + $legPolySkels[1] + $sfxPoly) $childJointTmp[0];
+     rename $childJointTmp[0] "lfLegLow_bindJoint";
+    // Parent rt leg poly bones under maya joints
+     parent ($pfx2 + $legPolySkels[0] + $sfxPoly) $skelNodeNames[7];
+     string $childJointTmp[] = BS_getChildJoint ($skelNodeNames[7]);
+     parent ($pfx2 + $legPolySkels[1] + $sfxPoly) $childJointTmp[0];
+     rename $childJointTmp[0] "rtLegLow_bindJoint";
+    // Parent Pelvis
+     parent ($pfx0 + $torsoPolySkels[0] + $sfxPoly) $controlIconNames[6];
+     parent ($pfx0 + $moreFkRigNodes[4] + $sfxFkGp) $controlIconNames[6];
+    // Parent Backbone
+     parent ($pfx0 + $moreFkRigNodes[5] + $sfxFkGp) $skelNodeNames[16];
+     string $childJointTmp[] = BS_getChildJoint ($skelNodeNames[16]);
+     parent ($pfx0 + $moreFkRigNodes[6] + $sfxFkGp) $childJointTmp[0];
+     string $childJointTmp[] = BS_getChildJoint ($childJointTmp[0]);
+     parent ($pfx0 + $moreFkRigNodes[7] + $sfxFkGp) $childJointTmp[0];
+     parent ($pfx0 + $moreFkRigNodes[8] + $sfxFkGp) $skelNodeNames[17];
+    // Parent Neck
+     parent ($pfx0 + $moreFkRigNodes[9] + $sfxFkGp) $skelNodeNames[18];
+    // Parent the skull and eyeballs under maya joints
+     parent ($pfx0 + $torsoPolySkels[1] + $sfxPoly) $skelNodeNames[20];
+     parent ($pfx0 + $torsoPolySkels[2] + $sfxPoly) $skelNodeNames[22];
+     parent ($pfx0 + $moreFkRigNodes[0] + $sfxFkGp) $skelNodeNames[20];
+    // Parent left arm poly bones under maya joints
+     parent ($pfx1 + $armPolySkels[0] + $sfxPoly) $skelNodeNames[24];
+     parent ($pfx1 + $armPolySkels[1] + $sfxPoly) $skelNodeNames[30];
+     parent ($pfx1 + $armPolySkels[2] + $sfxPoly) $skelNodeNames[36];
+     string $childJointTmp[] = BS_getChildJoint ($skelNodeNames[36]);
+     parent ($pfx1 + $armPolySkels[3] + $sfxPoly)
+            ($pfx1 + $armPolySkels[4] + $sfxPoly) $childJointTmp[0];
+     string $renamed = `rename $childJointTmp[0] "lfArmLow_bindJoint"`;
+     string $childJointTmp[] = BS_getChildJoint ($renamed);
+     rename $childJointTmp[0] "lfArmTurn_bindJoint";
+     parent ($pfx1 + $moreFkRigNodes[1] + $sfxFkGp) $skelNodeNames[42];
+    // Parent right arm poly bones under maya joints
+     parent ($pfx2 + $armPolySkels[0] + $sfxPoly) $skelNodeNames[27];
+     parent ($pfx2 + $armPolySkels[1] + $sfxPoly) $skelNodeNames[33];
+     parent ($pfx2 + $armPolySkels[2] + $sfxPoly) $skelNodeNames[39];
+     string $childJointTmp[] = BS_getChildJoint ($skelNodeNames[39]);
+     parent ($pfx2 + $armPolySkels[3] + $sfxPoly)
+            ($pfx2 + $armPolySkels[4] + $sfxPoly) $childJointTmp[0];
+     string $renamed = `rename $childJointTmp[0] "rtArmLow_bindJoint"`;
+     string $childJointTmp[] = BS_getChildJoint ($renamed);
+     rename $childJointTmp[0] "rtArmTurn_bindJoint";
+     parent ($pfx2 + $moreFkRigNodes[1] + $sfxFkGp) $skelNodeNames[44];
+    // Rename all FK poly skels, Fk group nodes and fk models with namespacing:
+     select -cl;
+     select -tgl "*_fkGroup";
+     select -tgl "*_polySkel";
+     select -tgl "*_model";
+     string $renameFk[] = `ls -sl`;
+     string $current;
+     for ($current in $renameFk)
+     { // open loop
+       namespace -set ":";
+       rename (":" + $current) ($nSpace + ":" + $current);
+       namespace -set $nSpace;
+     } //close for in loop
+    // ----------------------------------------------------------------------------------------
+    // create DoNotMove node, and parent under topNode
+     string $doNotMove = `group -n ($pfx0 + $controlGroups[0] + $sfxGroup) -em -p $topNode`;
+    // Parent the MoveAll icon under DoNotMove group node
+     string $childrenTemp[] = {$controlIconNames[0]};
+     string $chldDoNotMove[] = BS_rigParentor ($doNotMove,$childrenTemp,1);
+    // ----------------------------------------------------------------------------------------
+    // lower body hierarchy
+    // Parent Feet icon under MoveAll node
+     string $childrenTemp[] = {$controlIconNames[1]};
+     string $chldMoveAll[] = BS_rigParentor ($chldDoNotMove[0],$childrenTemp,1);
+    // Parent leg box icon under feet icon
+     string $childrenTemp[] = {$controlIconNames[2],$controlIconNames[3]};
+     string $chldFeet[] = BS_rigParentor ($chldMoveAll[0],$childrenTemp,1);
+    // Parent lf foot box skeleton, legIk & knee icon under lf leg icon
+     string $childrenTemp[] = {$skelNodeNames[0],$controlIconNames[4],$skelNodeNames[6]};
+     string $chLfLeg[] = BS_rigParentor ($chldFeet[0],$childrenTemp,1);
+    // Parent rt foot box skeleton, legIk & knee icon under rt leg icon
+     string $childrenTemp[] = {$skelNodeNames[2],$controlIconNames[5],$skelNodeNames[9]};
+     string $chRtLeg[] = BS_rigParentor ($chldFeet[1],$childrenTemp,1);
+    // Add pole vector constraints on leg IK to knee icons
+     poleVectorConstraint -n "lfKnee_pvConstraint" $controlIconNames[4] $skelNodeNames[6];
+     poleVectorConstraint -n "rtKnee_pvConstraint" $controlIconNames[5] $skelNodeNames[9];
+    // ----------------------------------------------------------------------------------------
+    // Create the Lower Torso hierarchy:
+    // Create,parent, & move torsoAuto group nodes under MoveAll node
+     string $torsoAutos[] = BS_doubleGrouper ($pfx0,$controlGroups[1],$controlIconNames[0]);
+    // Move torsoAuto0 groups with constraints then delete temp constraints
+     string $moveTemp[] = {$torsoAutos[0]};
+     BS_nodeMover ($controlIconNames[7],$moveTemp,0,1);
+    // Parent the torso Icon under TorsoAuto1
+     string $childrenTemp[] = {$controlIconNames[7]};
+     BS_rigParentor ($torsoAutos[1],$childrenTemp,1);
+    // Create,parent, and move hipsAuto group nodes under Torso node:
+     string $hipsAutos[] = BS_doubleGrouper ($pfx0,$controlGroups[2],$controlIconNames[7]);
+    // Move hipsAuto group with constraints then delete temp constraints
+     string $moveTemp[] = {$hipsAutos[0]};
+     BS_nodeMover ($controlIconNames[6],$moveTemp,0,1);
+    // Parent the Hips Icon under HipsAuto1
+     string $childrenTemp[] = {$controlIconNames[6]};
+     BS_rigParentor ($hipsAutos[1],$childrenTemp,1);
+    // Parent FK Hip skel and Backbone skel under the Torso icon:
+     string $childrenTemp[] = {$skelNodeNames[16],$skelNodeNames[10]};
+     BS_rigParentor ($controlIconNames[7],$childrenTemp,1);
+    // Point constrain Hips icon to main hip skeleton
+     pointConstraint -n "ctHips_ptConstraint" -mo -weight 1 $skelNodeNames[11] $controlIconNames[6];
+    // Create hisPad group nodes for hips skeletons:
+     string $hipsGroup2[] = BS_doubleGrouper ($pfx0,$controlGroups[6],$controlIconNames[6]);
+    // Move hips groups to hips box postion
+     string $moveTemp[] = {$hipsGroup2[0]};
+     BS_nodeMover ($controlIconNames[6],$moveTemp,0,1);
+    // Parent the leg and hip skeletons under Hips groups
+     string $childrenTemp[] = {$skelNodeNames[4],$skelNodeNames[7],$skelNodeNames[12],
+                               $skelNodeNames[14]};
+     BS_rigParentor ($hipsGroup2[1],$childrenTemp,0);
+    // ----------------------------------------------------------------------------------------
+    // Create the Upper Torso hierarchy
+    // Create backPad group nodes:
+     string $backGroups[] = BS_doubleGrouper ($pfx0,$controlGroups[3],$skelNodeNames[17]);
+    // Move backPad groups to end of backbone position
+     string $moveTemp[] = {$backGroups[0]};
+     BS_nodeMover ($skelNodeNames[17],$moveTemp,0,1);
+    // Parent nodes under second backPad that should be frozen
+     string $childrenTemp[] = {$controlIconNames[8],$controlIconNames[13], $controlIconNames[9],
+                               $controlIconNames[10], $controlIconNames[11], $controlIconNames[12]};
+     BS_rigParentor ($backGroups[1],$childrenTemp,1);
+    // Parent nodes under second backPad that should NOT be frozen
+     string $childrenTemp[] = {$skelNodeNames[24],$skelNodeNames[27],$skelNodeNames[30],
+                               $skelNodeNames[33],$skelNodeNames[18]};
+     BS_rigParentor ($backGroups[1],$childrenTemp,0);
+    // ----------------------------------------------------------------------------------------
+    // Create the Head hierarchy
+    // Parent head skull, jaw skel, and eyes icon under head icon
+     string $childrenTemp[] = {$skelNodeNames[20],$skelNodeNames[22],$controlIconNames[14]};
+     BS_rigParentor ($controlIconNames[13],$childrenTemp,1);
+    // Point constrainn Head icon to neck end skeleton
+     pointConstraint -n "ctHead_ptConstraint" -mo -weight 1 $skelNodeNames[19] $controlIconNames[13];
+    // Create EysPad group nodes:
+     string $eyeGroup[] = BS_doubleGrouper ($pfx0,$controlGroups[11],$controlIconNames[14]);
+     string $renamed = `rename $eyeGroup[1] "ctEyeJitter_controlGroup"`;
+    // Create locators to constrain individual eyeballs:
+     string $lfEyeLoc[] = `spaceLocator -n ($pfx1 + "Eye_locator") -p 0 0 0`;
+     string $rtEyeLoc[] = `spaceLocator -n ($pfx2 + "Eye_locator") -p 0 0 0`;
+    // move eyePad groups and locators to the eyes icon postion
+     string $moveTemp[] = {$eyeGroup[0],$lfEyeLoc[0],$rtEyeLoc[0]};
+     BS_nodeMover ($controlIconNames[4],$moveTemp,0,1);
+    // Parent Locators under Eye group nodes
+     string $childrenTemp[] = {$lfEyeLoc[0],$rtEyeLoc[0]};
+     BS_rigParentor ($renamed,$childrenTemp,0);
+    // Move locators in front of each eye & freeze
+     move -r -ls -wd 0.7 0.0 0.0 $lfEyeLoc[0];
+     makeIdentity -a 1 -t 1 -r 1 -s 1 $lfEyeLoc[0];
+     move -r -ls -wd 0.7 0.0 0.0 $rtEyeLoc[0];
+     makeIdentity -a 1 -t 1 -r 1 -s 1 $rtEyeLoc[0];
+    // Constrain eyeballs to locators with aim constraints
+     aimConstraint -n "lfEyesaiConstraint" -aim 0 0 1 -u 0 1 0
+             $lfEyeLoc[0] ($nSpace + ":" + $pfx1 + "Eye" + $sfxFkGp);
+     aimConstraint -n "rtEyesaiConstraint" -aim 0 0 1 -u 0 1 0
+             $rtEyeLoc[0] ($nSpace + ":" + $pfx2 + "Eye" + $sfxFkGp);
+    // ----------------------------------------------------------------------------------------
+    // Create Left arm hierarchy
+    // Create left clavicleAuto group nodes under the shoulders icon
+     string $lfClavAuto[] = BS_doubleGrouper ($pfx1,$controlGroups[10],$controlIconNames[8]);
+    // Move left clavicleAuto0 to left clavicle root position:
+     string $moveTemp[] = {$lfClavAuto[0]};
+     BS_nodeMover ($skelNodeNames[24],$moveTemp,1,1);
+    // Parent left clavicla IK under left clavicleAuto1:
+     string $childrenTemp[] = {$skelNodeNames[26]};
+     BS_rigParentor ($lfClavAuto[1],$childrenTemp,0);
+    // Parent left scapula IK & arm root under left clavicle IK:
+     string $childrenTemp[] = {$skelNodeNames[32],$skelNodeNames[36]};
+     BS_rigParentor ($skelNodeNames[26],$childrenTemp,0);
+    // Create left pad node for the main hand group nodes:
+     string $lfHandPad = ($pfx1 + $controlGroups[14] + $sfxGroup);
+     string $lfHandPad = `group -n $lfHandPad -em -p $skelNodeNames[37]`;
+    // Create left hand wave group nodes for hand skeleton:
+     string $lfHandGroups[] = BS_doubleGrouper ($pfx1,$controlGroups[7],$lfHandPad);
+     string $lfHandWave = ($pfx1 + $controlGroups[12] + $sfxGroup);
+     string $lfHandShake = ($pfx1 + $controlGroups[13] + $sfxGroup);
+     $lfHandGroups[0] = `rename $lfHandGroups[0] $lfHandWave`;
+     $lfHandGroups[1] = `rename $lfHandGroups[1] $lfHandShake`;
+    // Move hand groups to wrist:
+     string $moveTemp[] = {$lfHandPad};
+     BS_nodeMover ($skelNodeNames[42],$moveTemp,1,1);
+    // Parent left hand skeleton under left hand group
+     string $childrenTemp[] = {$skelNodeNames[42]};
+     BS_rigParentor ($lfHandGroups[1],$childrenTemp,1);
+    // Parent left arm IK under the left arm icon:
+     string $childrenTemp[] = {$skelNodeNames[38]};
+     BS_rigParentor ($controlIconNames[9],$childrenTemp,0);
+    // Add pole vector constraint on left arm Ik to left elbow icon
+     poleVectorConstraint -n "lfElbow_pvConstraint" $controlIconNames[11] $skelNodeNames[38];
+    // ----------------------------------------------------------------------------------------
+    // Create Right arm hierarchy
+    // Create Right clavicleAuto group nodes under the shoulders icon
+     string $rtClavAuto[] = BS_doubleGrouper ($pfx2,$controlGroups[10],$controlIconNames[8]);
+    // Move Right clavicleAuto0 to Right clavicle root position:
+     string $moveTemp[] = {$rtClavAuto[0]};
+     BS_nodeMover ($skelNodeNames[27],$moveTemp,1,1);
+    // Parent Right clavicla IK under Right clavicleAuto1:
+     string $childrenTemp[] = {$skelNodeNames[29]};
+     BS_rigParentor ($rtClavAuto[1],$childrenTemp,0);
+    // Parent Right scapula IK & arm root under Right clavicle IK:
+     string $childrenTemp[] = {$skelNodeNames[35],$skelNodeNames[39]};
+     BS_rigParentor ($skelNodeNames[29],$childrenTemp,0);
+    // Create Right pad node for the main hand group nodes:
+     string $rtHandPad = ($pfx2 + $controlGroups[14] + $sfxGroup);
+     string $rtHandPad = `group -n $rtHandPad -em -p $skelNodeNames[40]`;
+    // Create Right hand wave group nodes for hand skeleton:
+     string $rtHandGroups[] = BS_doubleGrouper ($pfx2,$controlGroups[7],$rtHandPad);
+     string $rtHandWave = ($pfx2 + $controlGroups[12] + $sfxGroup);
+     string $rtHandShake = ($pfx2 + $controlGroups[13] + $sfxGroup);
+     $rtHandGroups[0] = `rename $rtHandGroups[0] $rtHandWave`;
+     $rtHandGroups[1] = `rename $rtHandGroups[1] $rtHandShake`;
+    // Move hand groups to wrist:
+     string $moveTemp[] = {$rtHandPad};
+     BS_nodeMover ($skelNodeNames[44],$moveTemp,1,1);
+    // Parent Right hand skeleton under Right hand group
+     string $childrenTemp[] = {$skelNodeNames[44]};
+     BS_rigParentor ($rtHandGroups[1],$childrenTemp,1);
+    // Parent Right arm IK under the Right arm icon:
+     string $childrenTemp[] = {$skelNodeNames[41]};
+     BS_rigParentor ($controlIconNames[10],$childrenTemp,0);
+    // Add pole vector constraint on Right arm Ik to Right elbow icon
+     poleVectorConstraint -n "rtElbow_pvConstraint" $controlIconNames[12] $skelNodeNames[41];
+    // ----------------------------------------------------------------------------------------
+    // clear selection
+     select -cl;
+    // set nameSpace to root
+     namespace -set ":";
+     print ("Namespace has been set back to root (:) \n");
+    // ----------------------------------------------------------------------------------------
+    // List all node paths in the rig hierarchy:
+    // string $basicRigNodes[] = sort (`listRelatives -ad -typ "transform" $topNode`)
+     string $basicRigNodes[] = `listRelatives -ad -typ "transform" $topNode`;
+    /* Start return array...
+       [0]lfFoot_endJoint
+       [1]lfToes_polySkel
+       [2]lfFootBall_bindJoint
+       [3]lfFoot_polySkel
+       [4]lfFoot_rootJoint
+       [5]lfKnee_controlIcon
+       [6]lfKnee_pvConstraint
+       [7]lfLeg_rpIkHandle
+       [8]lfLeg_controlIcon
+       [9]rtFoot_endJoint
+       [10]rtToes_polySkel
+       [11]rtFootBall_bindJoint
+       [12]rtFoot_polySkel
+       [13]rtFoot_rootJoint
+       [14]rtKnee_controlIcon
+       [15]rtKnee_pvConstraint
+       [16]rtLeg_rpIkHandle
+       [17]rtLeg_controlIcon
+       [18]ctFeet_controlIcon
+       [19]ctPelvis_polySkel
+       [20]ctVertebrae0_polySkel
+       [21]ctVertebrae1_polySkel
+       [22]ctBackPolySkels0_fkGroup
+       [23]ctHips_ptConstraint
+       [24]lfLeg_endJoint
+       [25]effector1
+       [26]lfTibFib_polySkel
+       [27]lfLegLow_bindJoint
+       [28]lfFemur_polySkel
+       [29]lfLeg_rootJoint
+       [30]rtLeg_endJoint
+       [31]effector2
+       [32]rtTibFib_polySkel
+       [33]rtLegLow_bindJoint
+       [34]rtFemur_polySkel
+       [35]rtLeg_rootJoint
+       [36]lfHips_endJoint
+       [37]lfHips_bindJoint
+       [38]lfHips_bindJoint
+       [39]lfHips_rootJoint
+       [40]rtHips_endJoint
+       [41]rtHips_bindJoint
+       [42]rtHips_bindJoint
+       [43]rtHips_rootJoint
+       [44]ctHipsPad1_controlGroup
+       [45]ctHipsPad0_controlGroup
+       [46]ctHips_controlIcon
+       [47]ctHipsAuto1_controlGroup
+       [48]ctHipsAuto0_controlGroup
+       [49]ctVertebrae15_polySkel
+       [50]ctVertebrae16_polySkel
+       [51]ctBackPolySkels4_fkGroup
+       [52]lfScapula_rpIkHandle
+       [53]lfHand_endJoint
+       [54]lfThumb3_polySkel
+       [55]lfThumb2_polySkel
+       [56]lfThumb1_polySkel
+       [57]lfIndex2_polySkel
+       [58]lfIndex1_polySkel
+       [59]lfHand_polySkel
+       [60]lfIndex3_polySkel
+       [61]lfIndex0_polySkel
+       [62]lfRing0_polySkel
+       [63]lfMiddle1_polySkel
+       [64]lfRing1_polySkel
+       [65]lfPinky0_polySkel
+       [66]lfPinky1_polySkel
+       [67]lfMiddle2_polySkel
+       [68]lfMiddle3_polySkel
+       [69]lfRing2_polySkel
+       [70]lfPinky2_polySkel
+       [71]lfRing3_polySkel
+       [72]lfPinky3_polySkel
+       [73]lfHandPolySkels_fkGroup
+       [74]lfHand_rootJoint
+       [75]lfHandShake_controlGroup
+       [76]lfHandWave_controlGroup
+       [77]lfHandPad_controlGroup
+       [78]lfArm_endJoint
+       [79]lfArmTurn_bindJoint
+       [80]effector7
+       [81]lfUlna_polySkel
+       [82]lfRadius_polySkel
+       [83]lfArmLow_bindJoint
+       [84]lfHumerus_polySkel
+       [85]lfArm_rootJoint
+       [86]lfClavicle_rpIkHandle
+       [87]lfClavicleAuto1_controlGroup
+       [88]lfClavicleAuto0_controlGroup
+       [89]rtScapula_rpIkHandle
+       [90]rtHand_endJoint
+       [91]rtThumb3_polySkel
+       [92]rtThumb2_polySkel
+       [93]rtThumb1_polySkel
+       [94]rtIndex2_polySkel
+       [95]rtIndex1_polySkel
+       [96]rtHand_polySkel
+       [97]rtIndex3_polySkel
+       [98]rtIndex0_polySkel
+       [99]rtRing0_polySkel
+       [100]rtMiddle1_polySkel
+       [101]rtRing1_polySkel
+       [102]rtPinky0_polySkel
+       [103]rtPinky1_polySkel
+       [104]rtMiddle2_polySkel
+       [105]rtMiddle3_polySkel
+       [106]rtRing2_polySkel
+       [107]rtPinky2_polySkel
+       [108]rtRing3_polySkel
+       [109]rtPinky3_polySkel
+       [110]rtHandPolySkels_fkGroup
+       [111]rtHand_rootJoint
+       [112]rtHandShake_controlGroup
+       [113]rtHandWave_controlGroup
+       [114]rtHandPad_controlGroup
+       [115]rtArm_endJoint
+       [116]rtArmTurn_bindJoint
+       [117]effector8
+       [118]rtUlna_polySkel
+       [119]rtRadius_polySkel
+       [120]rtArmLow_bindJoint
+       [121]rtHumerus_polySkel
+       [122]rtArm_rootJoint
+       [123]rtClavicle_rpIkHandle
+       [124]rtClavicleAuto1_controlGroup
+       [125]rtClavicleAuto0_controlGroup
+       [126]ctShoulders_controlIcon
+       [127]ctHead_endJoint
+       [128]ctSkull_polySkel
+       [129]lfPupil_model
+       [130]lfCornea_model
+       [131]lfEyeball_model
+       [132]lfEyesaiConstraint
+       [133]lfEye_fkGroup
+       [134]rtPupil_model
+       [135]rtCornea_model
+       [136]rtEyeball_model
+       [137]rtEyesaiConstraint
+       [138]rtEye_fkGroup
+       [139]ctEyes_fkGroup
+       [140]ctHead_rootJoint
+       [141]ctJaw_endJoint
+       [142]ctJaw_bindJoint
+       [143]ctJaw_polySkel
+       [144]ctJaw_rootJoint
+       [145]lfEye_locator
+       [146]rtEye_locator
+       [147]ctEyeJitter_controlGroup
+       [148]ctEyesPad0_controlGroup
+       [149]ctEyes_controlIcon
+       [150]ctHead_ptConstraint
+       [151]ctHead_controlIcon
+       [152]lfElbow_pvConstraint
+       [153]lfArm_rpIkHandle
+       [154]lfArm_controlIcon
+       [155]rtElbow_pvConstraint
+       [156]rtArm_rpIkHandle
+       [157]rtArm_controlIcon
+       [158]lfElbow_controlIcon
+       [159]rtElbow_controlIcon
+       [160]lfClavicle_endJoint
+       [161]effector3
+       [162]lfClavicle_polySkel
+       [163]lfClavicle_rootJoint
+       [164]rtClavicle_endJoint
+       [165]effector4
+       [166]rtClavicle_polySkel
+       [167]rtClavicle_rootJoint
+       [168]lfScapula_endJoint
+       [169]effector5
+       [170]lfScapula_polySkel
+       [171]lfScapula_rootJoint
+       [172]rtScapula_endJoint
+       [173]effector6
+       [174]rtScapula_polySkel
+       [175]rtScapula_rootJoint
+       [176]ctFkNeck_controlEnd
+       [177]ctVertebrae17_polySkel
+       [178]ctVertebrae18_polySkel
+       [179]ctVertebrae19_polySkel
+       [180]ctVertebrae20_polySkel
+       [181]ctVertebrae21_polySkel
+       [182]ctNeckPolySkels_fkGroup
+       [183]ctFkNeck_controlRoot
+       [184]ctBackpad1_controlGroup
+       [185]ctBackpad0_controlGroup
+       [186]ctFkBack_controlEnd
+       [187]ctVertebrae9_polySkel
+       [188]ctVertebrae10_polySkel
+       [189]ctVertebrae11_polySkel
+       [190]ctVertebrae12_polySkel
+       [191]ctVertebrae8_polySkel
+       [192]ctVertebrae7_polySkel
+       [193]ctVertebrae13_polySkel
+       [194]ctVertebrae14_polySkel
+       [195]ctBackPolySkels3_fkGroup
+       [196]ctFkBack_controlJoint
+       [197]ctVertebrae4_polySkel
+       [198]ctVertebrae5_polySkel
+       [199]ctVertebrae6_polySkel
+       [200]ctBackPolySkels2_fkGroup
+       [201]ctFkBack_controlJoint
+       [202]ctVertebrae3_polySkel
+       [203]ctVertebrae2_polySkel
+       [204]ctBackPolySkels1_fkGroup
+       [205]ctFkBack_controlRoot
+       [206]ctFkHips_controlEnd
+       [207]ctFkHips_controlRoot
+       [208]ctTorso_controlIcon
+       [209]ctTorsoAuto1_controlGroup
+       [210]ctTorsoAuto0_controlGroup
+       [211]ctMoveAll_controlIcon
+       [212]ctDoNotMove_controlGroup
+       End return array */
+    // Return top node name of rig:
+    return $basicRigNodes;
+   } // Close procedure BS_createBasicRig starts on line 83
+ // *******************************************************************************************
+  print "global procedure BS_createBasicRig is now loaded into memory. \n";
+ // *******************************************************************************************
+ // Run procedures to create basic rig
+ // -------------------------------------------------------------------------------------------
+  print "Running all procs to create the basic BS biped rig! \n";
+  print "------------------------------------------------------\n";
+ // Run proc to create all nodes and parent them into a rig:
+  string $basicRigNodes[] = BS_createBasicRig();
+  print "BS basic biped rig is created!\n";
+  print "------------------------------------------------------\n";
+  print "BS_createBasicRig proc returns the rig hierarchy:  \n";
+  print "******************************************************\n";
+ // -------------------------------------------------------------------------------------------
+ // Get the name of the rig from mayas enviroment:
+  string $rigName = `getenv "BS_RigName"`;
+  string $filePath = `getenv "BS_FilePath"`;
+ // Write return value to file:
+  string $basicRigFile = ($filePath + $rigName + "_basicRig.rig");
+ // Write .rig file:
+  int $fileId = `fopen $basicRigFile "w"`;
+ // Use loop to print array positions and contents:
+  int $i;
+  for ($i = 0; $i < size($basicRigNodes); $i++)
+  { // open loop
+    // Print to cmd !Note removing namespacing for printing
+     string $buffer[];
+     tokenize $basicRigNodes[$i] ":" $buffer;
+     print ("[" + $i + "]" + $buffer[1] + "\n");
+    // Print to file:
+     fprint $fileId ($basicRigNodes[$i] + "\n");
+  } // close loop
+  fclose $fileId;
+ // -------------------------------------------------------------------------------------------
+ // Edit to enable & update the button and checkBox in GUI:
+  button -e -vis 0 "BS_intermRigButton";
+  button -e -en 1 -vis 1 -bgc 0.0 1.0 0.0 "BS_intermRigButton";
+  //checkBox -e -en 1 "BS_basicBindCheck";
+  button -e -l "Done" -en 0 "BS_basicRigButton";
+ // *******************************************************************************************
+  print "------------------------------------------------------\n";
+  print "BS_createBasicRig scrpt done!\n";
+  print "******************************************************\n \n";
+  // EOF

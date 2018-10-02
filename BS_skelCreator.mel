@@ -1,0 +1,80 @@
+/* ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+|   Script Name:    BS_skelCreator.mel;
+|   Procs:          global BS_skelCreator (matrix[][], string, string, int, string, int);
+|
+|   Notes:
+|    This file contains a global proc that creates a skeleton from arguments. Bind argument
+|    determines the suffix of the joints by using conditionals. A matrix is used in the
+|    arguments for the point position of each joint. IK can be added as a boolin argument.
+|    The procedure returns the name of the root joints, end joints, and the IK handle.
+|
+| ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ */
+
+ global proc string[] BS_skelCreator(matrix $positions[][], string $prefix, string $nameJoints,
+                                     int $skelSize, string $orient2ndAxis, int $createIk, int $bind)
+ {
+   // Declare important arrays and varibles:
+    string $rootJoint;
+    string $endJoint;
+    string $IkHandle[];
+    string $jointNames[];
+    string $rootSuffix;
+    string $jointSuffix;
+    string $endSuffix;
+
+   // Use conditional to determine naming convention
+    if ($bind == 1)
+    { //Open conditional...
+      $rootSuffix = "_rootJoint";
+      $jointSuffix = "_bindJoint";
+      $endSuffix = "_endJoint";
+    } // close if
+    else
+    { // Open Else
+      $rootSuffix = "_controlRoot";
+      $jointSuffix = "_controlJoint";
+      $endSuffix = "_controlEnd";
+    } // Close else
+
+   // Use array and loop to create joints using matrix positions:
+    select -cl;
+    int $lastJoint = ($skelSize - 1);
+    int $i;
+    for ($i = 0; $i < $skelSize; $i++)
+    { // Open for loop
+      if ($i == 0) $jointNames[size ($jointNames)] = `joint
+          -p $positions[$i][0] $positions[$i][1] $positions[$i][2]
+          -n ($prefix + $nameJoints + $rootSuffix)`;
+      else if ($i == $lastJoint) $jointNames[size ($jointNames)] = `joint
+          -p $positions[$i][0] $positions[$i][1] $positions[$i][2]
+          -n ($prefix + $nameJoints + $endSuffix)`;
+      else $jointNames[size ($jointNames)] = `joint
+          -p $positions[$i][0] $positions[$i][1] $positions[$i][2]
+          -n ($prefix + $nameJoints + $jointSuffix)`;
+    } // close for loop
+
+   // Freeze and orient bind joints selection:
+    select -r $jointNames[0];
+    makeIdentity -apply 1 -r 1;
+    joint -e -oj xyz -sao $orient2ndAxis -ch;
+    select -cl;
+
+   // Set root and end control joint bames for return:
+    $rootJoint = $jointNames[0];
+    $endJoint = $jointNames[$lastJoint];
+
+   // add RPIK solver to skeleton where nessacary set by arguements:
+    string $ikSuffix = "_rpIkHandle";
+    if ($createIk == 1) $IkHandle = `ikHandle -s 0 -sol "ikRPsolver" 
+           -n ($prefix + $nameJoints + $ikSuffix) -sj $rootJoint -ee $endJoint`;
+   // clear selection
+    select -cl;
+
+   // Return array containing names of main joints, and IK where nessacary
+    string $returnArray[];
+    if ($createIk == 1) $returnArray = {$rootJoint, $endJoint, $IkHandle[0]};
+    else $returnArray = {$rootJoint, $endJoint};
+    return $returnArray;
+
+ } // close procedure
+  // EOF

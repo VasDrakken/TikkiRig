@@ -1,0 +1,37 @@
+/* ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+|   Script Name:    BS_getNodeNames.mel;
+|   Procs:          global BS_getNodeNames (string, string);
+|
+|   Notes:
+|    This script contains a global procedures that enables the user to get nodes out of .rig
+|    files containing the rig hierarchy. The proc returns an array of names based on arguments.
+|
+| ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ */
+
+ global proc string[] BS_getNodeNames(string $type)
+ { // open procedure
+   // Get the name of the rig and file path from the enviroment:
+    string $rigName = `getenv "BS_RigName"`;
+    string $filePath = `getenv "BS_FilePath"`;
+    string $readFile = ($filePath + $rigName + "_" + $type + ".rig");
+   // Read basic rig node names from .rig file:
+    int $fileId = `fopen $readFile "r"`;
+    string $nodeNames[];
+    string $nextLine = `fgetline $fileId`;
+    string $buffer[];
+    $numTokens = `tokenize $nextLine "\n" $buffer`;
+    int $i = 0;
+    $nodeNames[$i] = $buffer[0];
+    while ( size($nextLine) > 0)
+    { // open loop
+      $i++;
+      $nextLine = `fgetline $fileId`;
+      string $buffer[];
+      $numTokens = `tokenize $nextLine "\n" $buffer`;
+      $nodeNames[$i] = $buffer[0];
+    } // close loop
+    fclose $fileId;
+    print ("Node list retrived from " + $readFile + "\n");
+    return $nodeNames;
+ } // close procedure.
+  // EOF

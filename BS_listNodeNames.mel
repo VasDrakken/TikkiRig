@@ -1,0 +1,87 @@
+/* ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+|   Script Name:    BS_listNodeNames.mel;
+|   Procs:          global BS_listNodeNames (string);
+|
+|   Notes:
+|    This file contains a global proc that creates arrays of all the names of the nodes
+|    that will be required in the CRI rig creation scripts and procedures.
+|
+|    Warning: The raw names for the arrays do NOT have prefixes or suffixes.
+|    After the arrays are created, a series of conditionals will allow the user to return
+|    the array specified in the initial argument.
+|
+| ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ */
+
+ global proc string[] BS_listNodeNames(string $switchArray)
+ {
+
+   // Array for names of main nodes in mocap friendly FK rig:
+    string $fkRigNodes[] = {"Hips","UpLeg","Leg","Foot","ToeBase","ToeEnd",
+               "Spine0","Spine1","Spine2","Spine3","Neck","Head","HeadEnd",
+               "Shoulder","Arm","Forearm","Hand","HandEnd"};
+    string $moreFkRigNodes[] = {"Eyes","HandPolySkels","Elbow","Knee",
+               "BackPolySkels0","BackPolySkels1","BackPolySkels2",
+               "BackPolySkels3","BackPolySkels4","NeckPolySkels","LegCurve",
+               "ArmCurve","StomachCurve","ChestCurve"};
+   //Arrays for all reference polygon skeleton names:
+    string $legPolySkels[] = {"Femur","TibFib","Foot","Toes"};
+    string $armPolySkels[] = {"Clavicle","Scapula","Humerus","Ulna","Radius"};
+    string $handPolySkels[] = {"Hand","Thumb1","Thumb2","Thumb3","Index0",
+           "Index1","Index2","Index3","Middle1","Middle2","Middle3","Ring0",
+           "Ring1","Ring2","Ring3","Pinky0","Pinky1","Pinky2","Pinky3"};
+    string $torsoPolySkels[] = {"Pelvis","Skull","Jaw"};
+    string $backPolySkels[] = {"Vertebrae0","Vertebrae1","Vertebrae2","Vertebrae3",
+           "Vertebrae4","Vertebrae5","Vertebrae6","Vertebrae7","Vertebrae8",
+           "Vertebrae9","Vertebrae10","Vertebrae11","Vertebrae12","Vertebrae13",
+           "Vertebrae14","Vertebrae15","Vertebrae16","Vertebrae17","Vertebrae18",
+           "Vertebrae19","Vertebrae20","Vertebrae21"};
+  //Array for all icon names and control group names:
+    string $iconNames[] = {"MoveAll","Feet","Leg","Knee","Hips","Torso",
+           "Shoulders","Arm","Elbow","Head","Eyes","MidBack","UpBack"};
+    string $controlGroups[] = {"DoNotMove","TorsoAuto","HipsAuto","Backpad",
+           "Wrist","FootRoll","HipsPad","HandWave","BreathPad","FingersPad",
+           "ClavicleAuto","EyesPad","HandWave","HandShake","HandPad",
+           "HeelRoll","FootRoll","ToeRoll","MidBackPad","UpBackPad",
+           "SplineIkBack","SplineIkNodes"};
+  //Arrays for all joint names in basic rig:
+    string $mainBindJoints[] = {"Foot","Leg","Hips","Back","Neck","Head","Jaw",
+           "Clavicle","Scapula","Arm","Hand","Thumb","Index","Middle","Ring",
+           "Pinky","MidBack","UpBack","LowBack"};
+    string $moreBindJoints[] = {"Side","RibsBot","RibsMid","RibsTop","Breath",
+           "Ulna","Radius","Elbow","Knee","ArmTurn","Armpit","Skull"};
+    string $controlJoints[] = {"FkHips","FkBack","FkNeck"};
+
+//---------------------------------------------------------------------------------
+ // Switch statement returns array name specified in proc argument:
+  string $returnArray[];
+  switch ($switchArray)
+  {
+    case "fkRigNodes": $returnArray = $fkRigNodes;
+     break;
+    case "moreFkRigNodes": $returnArray = $moreFkRigNodes;
+     break;
+    case "legPolySkels": $returnArray = $legPolySkels;
+     break;
+    case "armPolySkels": $returnArray = $armPolySkels;
+     break;
+    case "handPolySkels": $returnArray = $handPolySkels;
+     break;
+    case "torsoPolySkels": $returnArray = $torsoPolySkels;
+     break;
+    case "backPolySkels": $returnArray = $backPolySkels;
+     break;
+    case "iconNames": $returnArray = $iconNames;
+     break;
+    case "controlGroups": $returnArray = $controlGroups;
+     break;
+    case "mainBindJoints": $returnArray = $mainBindJoints;
+     break;
+    case "moreBindJoints": $returnArray = $moreBindJoints;
+     break;
+    case "controlJoints": $returnArray = $controlJoints;
+     break;
+  }
+ // Return array or names specified in argument:
+  return $returnArray;
+ }
+  // EOF

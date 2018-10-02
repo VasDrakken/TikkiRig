@@ -1,0 +1,90 @@
+/* ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+|   Script Name:    BS_iconCreator.mel;
+|   Procs:          global BS_iconCreator (string,string,string,vector,string);
+|
+|   Notes:
+|    This script contains a global procedure that creates all the icons needed in the
+|    biped rig. The Procedure creates the icon specifed by the arguments and returns
+|    the name of the icon.
+|
+| ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ */
+
+ global proc string BS_iconCreator (string $iconType, string $prefix, string $name,
+                                    vector $size, string $text)
+ { // Open procedure
+   // Process name with prefix and suffix:
+    string $iconName = ($prefix + $name + "_controlIcon");
+    string $returnName;
+   // Switch statement for selecting the icon from the argument:
+    switch ($iconType)
+    { // open switch statement
+      case "box":
+       { // creates a cube icon
+         $returnName = `curve -n $iconName -d 1 -p -0.5 0.5 0.5 -p 0.5 0.5 0.5 -p 0.5 0.5 -0.5
+          -p -0.5 0.5 -0.5 -p -0.5 0.5 0.5 -p -0.5 -0.5 0.5 -p 0.5 -0.5 0.5 -p 0.5 0.5 0.5
+          -p 0.5 0.5 -0.5 -p 0.5 -0.5 -0.5 -p 0.5 -0.5 0.5 -p -0.5 -0.5 0.5 -p -0.5 -0.5 -0.5
+          -p -0.5 0.5 -0.5 -p 0.5 0.5 -0.5 -p 0.5 -0.5 -0.5 -p -0.5 -0.5 -0.5
+          -k 0 -k 1 -k 2 -k 3 -k 4 -k 5 -k 6 -k 7 -k 8 -k 9 -k 10 -k 11 -k 12 -k 13 -k 14
+          -k 15 -k 16`;
+         xform -ws -s ($size.x)($size.y)($size.z) $returnName;
+       } // close case
+       break;
+      case "sphere":
+       { // creates a sphere icon
+         $returnName = `curve -n $iconName -d 1 -p 0 0 1
+          -p 0 0.5 0.866 -p 0 0.866 0.5 -p 0 1 0 -p 0 0.866 -0.5 -p 0 0.5 -0.866
+          -p 0 0 -1 -p 0 -0.5 -0.866 -p 0 -0.866 -0.5 -p 0 -1 0 -p 0 -0.866 0.5
+          -p 0 -0.5 0.866 -p 0 0 1 -p 0.707 0 0.707 -p 1 0 0 -p 0.707 0 -0.707
+          -p 0 0 -1 -p -0.707 0 -0.707  -p -1 0 0 -p -0.866 0.5 0 -p -0.5 0.866 0
+          -p 0 1 0 -p 0.5 0.866 0 -p 0.866 0.5 0 -p 1 0 0 -p 0.866 -0.5 0
+          -p 0.5 -0.866 0 -p 0 -1 0 -p -0.5 -0.866 0 -p -0.866 -0.5 0 -p -1 0 0
+          -p -0.707 0 0.707 -p 0 0 1 -k 0 -k 1 -k 2 -k 3 -k 4 -k 5 -k 6 -k 7 -k 8
+          -k 9 -k 10 -k 11 -k 12 -k 13 -k 14 -k 15 -k 16 -k 17 -k 18 -k 19 -k 20
+          -k 21 -k 22 -k 23 -k 24 -k 25 -k 26 -k 27 -k 28 -k 29 -k 30 -k 31 -k 32`;
+         xform -ws -s ($size.x)($size.y)($size.z) $returnName;
+       } // close case
+       break;
+      case "cone":
+       { // creates a cone icon
+         $returnName = `curve -n $iconName -d 1 -p 0 1 0
+          -p 0 -1 1 -p 0.707 -1 0.707 -p 0 1 0 -p 1 -1 0 -p 0.707 -1 -0.707
+          -p 0 1 0 -p 0 -1 -1 -p -0.707 -1 -0.707 -p 0 1 0 -p -1 -1 0
+          -p -0.707 -1 0.707 -p 0 1 0 -p 0 -1 1 -p -0.707 -1 0.707 -p -1 -1 0
+          -p -0.707 -1 -0.707 -p 0 -1 -1 -p 0.707 -1 -0.707 -p 1 -1 0
+          -p 0.707 -1 0.707 -p 0 -1 1 -k 0 -k 1 -k 2 -k 3 -k 4 -k 5 -k 6 -k 7
+          -k 8 -k 9 -k 10 -k 11 -k 12 -k 13 -k 14 -k 15 -k 16 -k 17 -k 18 -k 19
+          -k 20 -k 21`;
+         xform -ws -s ($size.x)($size.y)($size.z) $returnName;
+       } // close case
+       break;
+      case "arrow":
+       { // creates an arrow icon
+         $returnName = `curve -n $iconName -d 1 -p -6.99 0 -10.49
+          -p 0 0 -17.49 -p 6.99 0 -10.49 -p 3.49 0 -10.48 -p 3.49 0 -3.49
+          -p 10.49 0 -3.49 -p 10.49 0 -6.99 -p 17.49 0 0 -p 10.49 0 6.99
+          -p 10.49 0 3.49 -p 3.49 0 3.49 -p 3.49 0 10.49 -p 6.99 0 10.49
+          -p 0 0 17.49 -p -6.99 0 10.49 -p -3.49 0 10.49 -p -3.49 0 3.49
+          -p -10.49 0 3.49 -p -10.49 0 6.99 -p -17.49 0 0 -p -10.49 0 -6.99
+          -p -10.49 0 -3.49 -p -3.49 0 -3.49 -p -3.49 0 -10.49 -p -6.99 0 -10.49
+          -k 0 -k 1 -k 2 -k 3 -k 4 -k 5 -k 6 -k 7 -k 8 -k 9 -k 10 -k 11 -k 12
+          -k 13 -k 14 -k 15 -k 16 -k 17 -k 18 -k 19 -k 20 -k 21 -k 22 -k 23 -k 24`;
+         xform -ws -s ($size.x)($size.y)($size.z) $returnName;
+       } // close case
+       break;
+      case "text":
+       { // creates a text icon from $text (which should be the first letter of the icon name):
+         string $tempName[] = `textCurves -f "Arial" -t $text`;
+         string $childrenName[] = `listRelatives -ad $tempName[0]`;
+         parent -w $childrenName[1];
+         delete $tempName[0];
+         $returnName = `rename $childrenName[1] $iconName`;
+         xform -ws -s ($size.x)($size.y)($size.z) $returnName;
+       } // close case
+       break;
+    } // close switch statement.
+    // clear selections:
+     select -cl;
+    // return icon name:
+     return $returnName;
+ } // close procure.
+  // EOF

@@ -1,0 +1,342 @@
+/* ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+|   Script Name:    BS_createIcons.mel;
+|   Procs:          local BS_getSize (string, string[], vector[]);
+|                   local BS_nodeMover (string, string, int, int)
+|                   global BS_createIcons (string[]);
+|
+|   Other scripts sourced: BS_listNodeNames.mel & BS_createMainSkels.mel & BS_iconCreator.mel;
+|   Procs used in sourced scripts: BS_listNodeNames(string); BS_createMainSkels ();
+|                                  BS_iconCreator(string,string,string,vector,string);
+|
+|   Notes:
+|    This script contains procedures that create the main control icons. The icons must be
+|    created for the rig creation procedure. The icon names are used for parenting and returned.
+|    Six bloody lines were missing...
+|
+| ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ */
+
+ print " \n************************************************************************\n";
+ print "BS_createIcons script started\n";
+ print "------------------------------------------------------------------------\n";
+ print "procedures being loaded into memory...\n";
+
+ // Local procedure used to get icon size based on model verts:
+  proc vector BS_getSize (string $name, string $vertices[], vector $scale)
+  {
+    // Use point position & distance to find size of icons:
+     vector $ptPosX1 = `pointPosition ($name + $vertices[0])`;
+     vector $ptPosX2 = `pointPosition ($name + $vertices[1])`;
+     vector $ptPosY1 = `pointPosition ($name + $vertices[2])`;
+     vector $ptPosY2 = `pointPosition ($name + $vertices[3])`;
+     vector $ptPosZ1 = `pointPosition ($name + $vertices[4])`;
+     vector $ptPosZ2 = `pointPosition ($name + $vertices[5])`;
+     string $distanceDimX = `distanceDimension
+             -sp ($ptPosX1.x)($ptPosX1.y)($ptPosX1.z)
+             -ep ($ptPosX2.x)($ptPosX2.y)($ptPosX2.z)`;
+     float $distanceX = `getAttr ($distanceDimX + ".distance")`;
+     string $dagParent[] = `listRelatives -p $distanceDimX`;
+     string $distLocs[] = `listConnections -s 1 $distanceDimX`;
+     delete $dagParent[0] $distLocs[0] $distLocs[1];
+     // start y
+     string $distanceDimY = `distanceDimension
+             -sp ($ptPosY1.x)($ptPosY1.y)($ptPosY1.z)
+             -ep ($ptPosY2.x)($ptPosY2.y)($ptPosY2.z)`;
+     float $distanceY = `getAttr ($distanceDimY + ".distance")`;
+     string $dagParent[] = `listRelatives -p $distanceDimY`;
+     string $distLocs[] = `listConnections -s 1 $distanceDimY`;
+     delete $dagParent[0] $distLocs[0] $distLocs[1];
+     // start z
+     string $distanceDimZ = `distanceDimension
+             -sp ($ptPosZ1.x)($ptPosZ1.y)($ptPosZ1.z)
+             -ep ($ptPosZ2.x)($ptPosZ2.y)($ptPosZ2.z)`;
+     float $distanceZ = `getAttr ($distanceDimZ + ".distance")`;
+     string $dagParent[] = `listRelatives -p $distanceDimZ`;
+     string $distLocs[] = `listConnections -s 1 $distanceDimZ`;
+     delete $dagParent[0] $distLocs[0] $distLocs[1];
+    // Set vector size of icon based on vert dist
+     vector $iconSize = << ($distanceX + ($scale.x)),($distanceY + ($scale.y)),
+                           ($distanceZ + ($scale.z)) >>;
+    // return vector size
+     return $iconSize;
+  } // close proc
+  print "local proc BS_getSize is now loaded. \n";
+ // ******************************************************************************************
+ // Local proc used in postioning and creating icons:
+  proc BS_nodeMover (string $target, string $constrained[], int $orient, int $freeze)
+  { // moves nodes with constraints, the removes constraints:
+    string $node;
+    for ($node in $constrained)
+    {
+      string $tempCns[] = `pointConstraint -o 0 0 0 -w 1 -n "tempMvCns" $target $node`;
+      delete -cn $tempCns[0];
+      if ($orient == 1)
+      {
+        string $tempCns[] = `orientConstraint -o 0 0 0 -w 1 -n "tempMvCns" $target $node`;
+        delete -cn $tempCns[0];
+      } // close conditional
+    else if ($freeze == 1) makeIdentity -a 1 -t 1 -r 1 -s 1 $node;
+    } // close loop
+  } //close procedure.
+  print "local procedure BS_nodeMover is now loaded into memory.\n";
+ // ******************************************************************************************
+ // Global proc to create the basic rig
+  global proc string[] BS_createIcons (string $skelNames[])
+  {
+    // source file containing node names
+     source BS_listNodeNames;
+    // proc returns all names in array format
+     string $iconNames[] = BS_listNodeNames ("iconNames");
+     string $moreFkRigNodes[] = BS_listNodeNames("moreFkRigNodes");
+     string $torsoPolySkels[] = BS_listNodeNames("torsoPolySkels");
+    // -------------------------------------------------------------------------------------
+    // Source file containing global proc used in creating icons
+     source BS_iconCreator;
+    // string common string var used to create icons:
+     string $printIconName = "Icon created with name: ";
+     string $pfx0 = "ct";
+     string $pfx1 = "lf";
+     string $pfx2 = "rt";
+     string $sfxPoly = "_polySkel";
+     string $sfxFkRig = "_fkRig";
+    // -------------------------------------------------------------------------------------
+    // Set size data for MoveAll arror icon:
+     vector $iconSize = <<0.5,0.5,0.5>>;
+    // run proc
+     string $ctMoveAllIcon = BS_iconCreator("arrow",$pfx0,$iconNames[0],$iconSize,"none");
+    // print name of move all icon:
+     print ($printIconName + $ctMoveAllIcon + " \n");
+    // -------------------------------------------------------------------------------------
+    // Set size data for feet text icon:
+     vector $iconSize = <<1.5,1.5,1.5>>;
+    // run proc to create feet icon
+     string $ctFeetIcon = BS_iconCreator("text",$pfx0,$iconNames[1],$iconSize,"F");
+    // move verts
+     xform -r -wd -os -t 10.0 0.0 0.0 -ro 0.0 -25.0 0.0 ($ctFeetIcon + ".cv[0:9]");
+    // print name of torso icon
+     print ($printIconName + $ctFeetIcon + " \n");
+    // -------------------------------------------------------------------------------------
+    // get size data for left leg icon:
+     string $sizeVerts[] = {".cv[1]",".cv[5]",
+                            ".cv[1]",".cv[5]",
+                            ".cv[1]",".cv[5]"};
+     vector $scale = <<1.0,1.0,1.0>>;
+    // run proc get data
+     string $name = ($pfx1 + $moreFkRigNodes[10] + $sfxFkRig);
+     vector $iconSize = BS_getSize ($name,$sizeVerts,$scale);
+    // run proc create icon
+     string $lfLegIcon = BS_iconCreator("box",$pfx1,$iconNames[2],$iconSize,"none");
+    // run proc move icon
+     string $moveTemp[] = {$lfLegIcon};
+     BS_nodeMover ($skelNames[0],$moveTemp,0,0);
+    // print name of left leg icon
+     print ($printIconName + $lfLegIcon + " \n");
+    // dupe left leg to create right leg icon
+     string $catchDup[] = `duplicate -n ($pfx2 + $iconNames[2] + "_controlIcon") $lfLegIcon`;
+     string $rtLegIcon = $catchDup[0];
+    // run proc to move icon
+     string $moveTemp[] = {$rtLegIcon};
+     BS_nodeMover ($skelNames[2],$moveTemp,0,0);
+    // print name of right icon
+     print ($printIconName + $rtLegIcon + " \n");
+    // -------------------------------------------------------------------------------------
+    // set size data for left knee text icon
+     vector $iconSize = <<0.8,0.8,0.8>>;
+    // run proc to create left knee icon
+     string $lfKneeIcon = BS_iconCreator("text",$pfx1,$iconNames[3],$iconSize,"V");
+    // Find name of lower left leg
+     select -r $skelNames[4];
+     pickWalk -d "down";
+     string $childJointsTemp[] = `ls -sl`;
+     select -cl;
+    // run proc to move & orient tmp locator
+     string $tempNode[] = `spaceLocator -n "tempGroup" -p 0.0 0.0 0.0`;
+     string $moveTemp[] = {$tempNode[0]};
+     BS_nodeMover ($childJointsTemp[0],$moveTemp,1,0);
+     move -r -ls -wd 2.5 -4.0 7.0 $tempNode[0];
+    // run proc to move icon
+     string $moveTemp[] = {$lfKneeIcon};
+     BS_nodeMover ($tempNode[0],$moveTemp,0,0);
+    // move verts
+     xform -r -wd -os -t -1.1 0.0 -0.2 -ro 0.0 -25.0 0.0 ($lfKneeIcon + ".cv[0:18]");
+    // print name of icon
+     print ($printIconName + $lfKneeIcon + " \n");
+    // dupe left leg to create right icon
+     string $catchDup[] = `duplicate -n ($pfx2 + $iconNames[3] + "_controlIcon") $lfKneeIcon`;
+     string $rtKneeIcon = $catchDup[0];
+    // find name of lower right leg
+     select -r $skelNames[7];
+     pickWalk -d "down";
+     string $childJointsTemp[] = `ls -sl`;
+     select -cl;
+    //run proc to move & orient right leg
+     string $moveTemp[] = {$tempNode[0]};
+     BS_nodeMover ($childJointsTemp[0],$moveTemp,1,0);
+     move -r -ls -wd -2.5 -4.0 7.0 $tempNode[0];
+    // run proc to move node
+     string $moveTemp[] = {$rtKneeIcon};
+     BS_nodeMover ($tempNode[0],$moveTemp,0,0);
+    // delete temp node
+     delete $tempNode[0];
+    // print name of right leg icon
+     print ($printIconName + $rtKneeIcon + " \n");
+    // -------------------------------------------------------------------------------------
+    // get size data for hips icon
+     string $sizeVerts[] = {".vtx[129]",".vtx[327]",
+                            ".vtx[311]",".vtx[403]",
+                            ".vtx[328]",".vtx[378]"};
+     vector $scale = <<0.3,-0.3,1.0>>;
+    // run proc to get size
+     string $name = ($pfx0 + $torsoPolySkels[0] + $sfxPoly);
+     vector $iconSize = BS_getSize ($name,$sizeVerts,$scale);
+    // run proc to create hip icon
+     string $ctHipIcon = BS_iconCreator("box",$pfx0,$iconNames[4],$iconSize,"none");
+    // run proc to move icon
+     string $moveTemp[] = {$ctHipIcon};
+     BS_nodeMover ($skelNames[10],$moveTemp,0,0);
+    //move verts
+     move -r -ls -wd 0.0 -1.8 0.0 ($ctHipIcon + ".cv[0:16]");
+     string $tempCluster[] = `cluster ($ctHipIcon + ".cv[5:6]")
+                             ($ctHipIcon + ".cv[9:13]")($ctHipIcon + ".cv[16]")`;
+     move -r -ls -wd 0.0 0.0 -0.5 $tempCluster[1];
+     scale -r 1.2 1.0 1.0 $tempCluster[1];
+     delete -ch $ctHipIcon;
+    // print name of hip icon
+     print ($printIconName + $ctHipIcon + " \n");
+    // -------------------------------------------------------------------------------------
+    // set size data for torso icon
+     vector $iconSize = <<1.5,1.5,1.5>>;
+    // run proc create torso icon
+     string $ctTorsoIcon = BS_iconCreator("text",$pfx0,$iconNames[5],$iconSize,"T");
+    // run proc move icon
+     string $moveTemp[] = {$ctTorsoIcon};
+     BS_nodeMover ($skelNames[10],$moveTemp,0,0);
+    // move verts
+     xform -r -wd -os -t 6.6 -3.6 0.9 -ro 0.0 -26.9 0.0 ($ctTorsoIcon + ".cv[0:7]");
+    // print name torso
+     print ($printIconName + $ctTorsoIcon + " \n");
+    // -------------------------------------------------------------------------------------
+    // set size data for shoulders text icon
+     vector $iconSize = <<1.5,1.5,1.5>>;
+    // run proc to create shoulders icon
+     string $ctShouldersIcon = BS_iconCreator("text",$pfx0,$iconNames[6],$iconSize,"S");
+    // run proc to move icon
+     string $moveTemp[] = {$ctShouldersIcon};
+     BS_nodeMover ($skelNames[17],$moveTemp,0,0);
+    // move verts
+     xform -r -wd -os -t -10.3 -10.5 0.9 -ro 0.0 -26.5 0.0 ($ctShouldersIcon + ".cv[0:51]");
+    // print name of shoulders
+     print ($printIconName + $ctShouldersIcon + " \n");
+    // -------------------------------------------------------------------------------------
+    // get size data for left arm
+     string $sizeVerts[] = {".cv[3]",".cv[7]",
+                            ".cv[3]",".cv[7]",
+                            ".cv[3]",".cv[7]"};
+     vector $scale = <<0.2,0.2,0.2>>;
+    // run proc get size data
+     string $name = ($pfx1 + $moreFkRigNodes[11] + $sfxFkRig);
+     vector $iconSize = BS_getSize ($name,$sizeVerts,$scale);
+    // run proc create left arm icon
+     string $lfArmIcon = BS_iconCreator("sphere",$pfx1,$iconNames[7],$iconSize,"none");
+    // run proc move & orient
+     string $moveTemp[] = {$lfArmIcon};
+     BS_nodeMover ($skelNames[42],$moveTemp,1,0);
+    // print name of left arm icon
+     print ($printIconName + $lfArmIcon + " \n");
+    // dupe left arm to get right arm
+     string $catchDup[] = `duplicate -n ($pfx2 + $iconNames[7] + "_controlIcon")$lfArmIcon`;
+     string $rtArmIcon = $catchDup[0];
+    // run proc move & orient
+     string $moveTemp[] = {$rtArmIcon};
+     BS_nodeMover ($skelNames[44],$moveTemp,1,0);
+    // print name of right icon
+     print ($printIconName + $rtArmIcon + " \n");
+    // -------------------------------------------------------------------------------------
+    // Set size data for left elbow
+     vector $iconSize = <<0.8,0.8,0.8>>;
+    // run proc create elbow icon
+     string $lfElbowIcon = BS_iconCreator("text",$pfx1,$iconNames[8],$iconSize,"V");
+    // Find name of lower left arm
+     select -r $skelNames[36];
+     pickWalk -d "down";
+     string $childJointsTemp[] = `ls -sl`;
+     select -cl;
+    // run proc to move & orient
+     string $tempNode[] = `spaceLocator -n "tempGroup" -p 0.0 0.0 0.0`;
+     string $moveTemp[] = {$tempNode[0]};
+     BS_nodeMover ($childJointsTemp[0],$moveTemp,1,0);
+     move -r -ls -wd 0.0 -0.3 -5.0 $tempNode[0];
+    // run proc to move left elbow icon
+     string $moveTemp[] = {$lfElbowIcon};
+     BS_nodeMover ($tempNode[0],$moveTemp,0,0);
+    // move verts
+     xform -r -wd -os -t -1.0 0.0 -0.5 -ro 0.0 -25.0 0.0 ($lfElbowIcon + ".cv[0:18]");
+    // print name of elbow icon
+     print ($printIconName + $lfElbowIcon + " \n");
+    // dupe left elbow to create right elbow
+     string $catchDup[] = `duplicate -n ($pfx2 + $iconNames[8] + "_controlIcon") $lfElbowIcon`;
+     string $rtElbowIcon = $catchDup[0];
+    // find name of lower right arm
+     select -r $skelNames[39];
+     pickWalk -d "down";
+     string $childJointsTemp[] = `ls -sl`;
+     select -cl;
+    // run proc to move and orient
+     string $moveTemp[] = {$tempNode[0]};
+     BS_nodeMover ($childJointsTemp[0],$moveTemp,1,0);
+     move -r -ls -wd 0.0 -0.3 -5.0 $tempNode[0];
+    // run proc to move icon
+     string $moveTemp[] = {$rtElbowIcon};
+     BS_nodeMover ($tempNode[0],$moveTemp,0,0);
+    // delete tmp locator
+     delete $tempNode[0];
+    // print name of right elbow
+     print ($printIconName + $rtElbowIcon + " \n");
+    // -------------------------------------------------------------------------------------
+    // Get size data for head icon
+     string $sizeVerts[] = {".vtx[33]",".vtx[348]",
+                            ".vtx[8]",".vtx[28]",
+                            ".vtx[99]",".vtx[112]"};
+     vector $scale = <<0.6,0.6,0.6>>;
+    // run proc to get size data
+     string $name = ($pfx0 + $torsoPolySkels[1] + $sfxPoly);
+     vector $iconSize = BS_getSize ($name,$sizeVerts,$scale);
+    // run proc to create head icon
+     string $ctHeadIcon = BS_iconCreator("box",$pfx0,$iconNames[9],$iconSize,"none");
+    // run proc to move icon
+     string $moveTemp[] = {$ctHeadIcon};
+     BS_nodeMover ($skelNames[20],$moveTemp,0,0);
+    // move verts
+     move -r -ls -wd 0.0 1.2 0.5 ($ctHeadIcon + ".cv[0:16]");
+    // print name of head icon
+     print ($printIconName + $ctHeadIcon + " \n");
+    // -------------------------------------------------------------------------------------
+    // create eys icon
+     vector $iconSize = <<0.1,0.1,0.1>>;
+     string $ctEyesIcon = BS_iconCreator("arrow",$pfx0,$iconNames[10],$iconSize,"none");
+    // run proc move icon
+     string $eyesGroupFk = ($pfx0 + $moreFkRigNodes[0] + "_fkGroup");
+     string $moveTemp[] = {$ctEyesIcon};
+     BS_nodeMover ($eyesGroupFk,$moveTemp,0,0);
+    // move and orient icon in front of eyes
+     xform -r -wd -t 0.0 0.0 7.0 -ro 90.0 0.0 0.0 $ctEyesIcon;
+    // Print name of head icon
+     print ($printIconName + $ctEyesIcon + " \n");
+    // -------------------------------------------------------------------------------------
+    // create array of all icon names:
+     string $controlIconNames[] = {$ctMoveAllIcon,$ctFeetIcon,$lfLegIcon,$rtLegIcon,
+            $lfKneeIcon,$rtKneeIcon,$ctHipIcon,$ctTorsoIcon,$ctShouldersIcon,
+            $lfArmIcon,$rtArmIcon,$lfElbowIcon,$rtElbowIcon,$ctHeadIcon,$ctEyesIcon};
+     /*  start block comment
+        Return Array guide:
+        End block Comment */
+
+    // Return array of all icons created:
+     return $controlIconNames;
+  } // close procedure
+ // ******************************************************************************************
+  print "gloval procedure BS_createIcons is now loaded into memory.\n";
+ // ******************************************************************************************
+  print "--------------------------------------------------------------\n";
+  print "BS_createIcons script done!\n";
+  print "**************************************************************\n \n";
+  // EOF

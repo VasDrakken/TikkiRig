@@ -1,0 +1,794 @@
+/* ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+|   Script Name:    BS_createAdvRig.mel;
+|   Procs:          local BS_getSize (string, string[], vector);
+|                   local BS_mirrorSkels (string, int);
+|                   local BS_rigParentor (string, string, int);
+|                   local BS_nodeMover (string, string[], int, int);
+|                   local BS_doubleGrouper (string, string, string);
+|                   local BS_getChildJoint (string);
+|                   global BS_createAdvRig ();
+|
+|   Other scripts sourced: BS_listNodeNames.mel & BS_skelCreator.mel & BS_iconCreator.mel
+|   Procs used in sourced scripts: BS_listNodeNames(string);
+|                                  BS_skelCreator (matrix[][], string, string, int, string, int);
+|                                  BS_iconCreator (string,string,string,vector,string);
+|
+|   Notes:
+|    This script contains procedures that finishes the biped rig by adding more bind skeletons,
+|    creating a footroll control, & adding a spline IK backbone control. Channels on icons are
+|    created, cleaned up and connected.  The scrpt returns an array of all the node names in
+|    the new hieararchy.
+|
+| ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ */
+
+  print " \n";
+  print "************************************************************************\n";
+  print "BS_createAdvRig script started";
+  print "------------------------------------------------------------------------\n";
+ // *******************************************************************************************
+ // all local procs being loaded into memory for skeleton creation
+ // -------------------------------------------------------------------------------------------
+  print "procedures being loaded into memory...\n";
+ // Local procedure used inn creating the basic rig:
+  proc vector BS_getSize (string $name, string $vertices[], vector $scale)
+  { // open procedure
+    // set up namespacing for dist dimension nodes
+     string $curNspace = `namespaceInfo -cur`;
+     string $nSpace;
+     if ($curNspace == ":")$nSpace = ":";
+     else $nSpace = ($curNspace + ":");
+    // use point position and distance to find size of icons
+     vector $ptPosX1 = `pointPosition ($name + $vertices[0])`;
+     vector $ptPosX2 = `pointPosition ($name + $vertices[0])`;
+     vector $ptPosY1 = `pointPosition ($name + $vertices[0])`;
+     vector $ptPosY2 = `pointPosition ($name + $vertices[0])`;
+     vector $ptPosZ1 = `pointPosition ($name + $vertices[0])`;
+     vector $ptPosZ2 = `pointPosition ($name + $vertices[0])`;
+    // $distanceDimX -----------------------------------------
+     string $distanceDimX = `distanceDimension
+                  -sp ($ptPosX1.x) ($ptPosX1.y) ($ptPosX1.z)
+                  -ep ($ptPosX2.x) ($ptPosX2.y) ($ptPosX2.z)`;
+     float $distanceX = `getAttr ($distanceDimX + ".distance")`;
+     string $dagParent[] = `listRelatives -p $distanceDimX`;
+     string $distLocs[] = `listConnections -s 1 $distanceDimX`;
+     delete $dagParent[0] $distLocs[0] $distLocs[1];
+    // $distanceDimY -----------------------------------------
+     string $distanceDimY = `distanceDimension
+                  -sp ($ptPosY1.x) ($ptPosY1.y) ($ptPosY1.z)
+                  -ep ($ptPosY2.x) ($ptPosY2.y) ($ptPosY2.z)`;
+     float $distanceY = `getAttr ($distanceDimY + ".distance")`;
+     string $dagParent[] = `listRelatives -p $distanceDimY`;
+     string $distLocs[] = `listConnections -s 1 $distanceDimY`;
+     delete $dagParent[0] $distLocs[0] $distLocs[1];
+    // $distanceDimZ -----------------------------------------
+     string $distanceDimZ = `distanceDimension
+                  -sp ($ptPosZ1.x) ($ptPosZ1.y) ($ptPosZ1.z)
+                  -ep ($ptPosZ2.x) ($ptPosZ2.y) ($ptPosZ2.z)`;
+     float $distanceZ = `getAttr ($distanceDimZ + ".distance")`;
+     string $dagParent[] = `listRelatives -p $distanceDimZ`;
+     string $distLocs[] = `listConnections -s 1 $distanceDimZ`;
+     delete $dagParent[0] $distLocs[0] $distLocs[1];
+    // Set vector size based of the icon based on vert dist:
+     vector $iconSize = << ($distanceX + ($scale.x)),
+                           ($distanceX + ($scale.x)),
+                           ($distanceX + ($scale.x))>>;
+    // return vector size
+     return $iconSize;
+  } // close procedure
+  print "local proc BS_getSize loaded into memory \n";
+ // *******************************************************************************************
+ // Local procedure to mirror joints and catch names using list selection:
+  proc string[] BS_mirrorSkels (string $sourceSkel, int $ik)
+  {
+    string $mirrorSkelNames[];
+    if ($ik == 1)
+    { // Open if
+       mirrorJoint -myz -mb -sr "lf" "rt" $sourceSkel;
+      // list selected to store main joints names in the array:
+       string $mirrorIk[] = `ls -sl`;
+       pickWalk -d left;
+       select -hi;
+       string $mirrorJoints[] = `ls -sl`;
+       int $endJoint = size($mirrorJoints) - 2;
+       $mirrorSkelNames = {$mirrorJoints[0],$mirrorJoints[$endJoint],$mirrorIk[0]};
+      // Clear selection
+       select -cl;
+    } //close if
+    else
+    { //open else
+       mirrorJoint -myz -mb -sr "lf" "rt" $sourceSkel;
+      // List selected to store main joints names in the array:
+       select -hi;
+       string $mirrorJoints[] = `ls -sl`;
+       int $endJoint = size($mirrorJoints) - 1;
+       $mirrorSkelNames = {$mirrorJoints[0], $mirrorJoints[$endJoint]};
+      // clear selection
+       select -cl;
+    } // close else
+    return $mirrorSkelNames;
+  } // close procedure
+  print "local procedure BS_mirrorSkels in now loaded into memory. \n";
+ // -------------------------------------------------------------------------------------------
+  proc string[] BS_rigParentor (string $parent, string $children[], int $freeze)
+  { // open procedure
+    string $names[];
+    string $child;
+    for ($child in $children)
+    {
+      string $name[] = `parent $child $parent`;
+      $names[size($names)] = $name[0];
+      if ($freeze == 1) makeIdentity -a 1 -t 1 -r 1 -s 1 $child;
+    } //close loop
+    return $names;
+  } // close procedure
+  print "local procedure BS_rigParentor is now loaded into memory.\n";
+ // -------------------------------------------------------------------------------------------
+ // Local procedure used to move &orient object to target node:
+  proc BS_nodeMover (string $target, string $constrained[], int $orient, int $freeze)
+  { // moves nodes with constraints, the removes constraints:
+    string $node;
+    for ($node in $constrained)
+    {
+      string $tempCns[] = `pointConstraint -o 0 0 0 -w 1 -n "tempMvCns" $target $node`;
+      delete -cn $tempCns[0];
+      if ($orient == 1)
+      {
+        string $tempCns[] = `orientConstraint -o 0 0 0 -w 1 -n "tempMvCns" $target $node`;
+        delete -cn $tempCns[0];
+      } // close conditional
+    else if ($freeze == 1) makeIdentity -a 1 -t 1 -r 1 -s 1 $node;
+    } // close loop
+  } //close procedure.
+  print "local procedure BS_nodeMover is now loaded into memory.\n";
+ // -------------------------------------------------------------------------------------------
+ // Local procedure used inn creating the basic rig:
+  proc string[] BS_doubleGrouper (string $pfx, string $name, string $parent)
+  {
+    string $sfx = "_controlGroup";
+    string $groupTop = `group -n ($pfx + $name + "0" + $sfx) -em -p $parent`;
+    string $groupBot = `group -n ($pfx + $name + "1" + $sfx) -em -p $groupTop`;
+    string $returnGroups[] = {$groupTop,$groupBot};
+    return $returnGroups;
+  } // close procedure
+  print "local procedure BS_doubleGrouper is now loaded into memory.\n";
+ // -------------------------------------------------------------------------------------------
+ // Local procedure used inn creating the basic rig:
+  proc string[] BS_getChildJoint (string $parent)
+  {
+    select -r $parent;
+    pickWalk -d "down";
+    string $returnChild[] = `ls -sl`;
+    select -cl;
+    return $returnChild;
+  } // close procedure
+  print "local procedure BS_getChildJoint is now loaded into memory.\n";
+ // *******************************************************************************************
+ // Global proc to add skeletons to the basic rig:
+  global proc string[] BS_createAdvRig ()
+  { // Open procedure BS_createIntRig Ends on Line 422
+    // get top node name from enviroment
+     string $topNode = `getenv "BS_TopNode"`;
+     string $rigName = `getenv "BS_RigName"`;
+    // source file containing global proc for reading .rig file
+     source BS_getNodeNames;
+    // run proc to get basic rig nodes names from file
+     string $intRigNodes[] = BS_getNodeNames("intRig");
+    // ----------------------------------------------------------------------------------------
+    // Start namespace option...
+    // Set namespace to top node Names:
+     string $nSpace = ($rigName + "Space");
+     if (`namespace -exists $nSpace`) namespace -set $nSpace;
+     else
+     {
+       $nSpace = `namespace -p ":" -add $nSpace`;
+       namespace -set $nSpace;
+       print ("Namespace had been set to: " + $nSpace + ":");
+     } // close conditional
+    // end namespace option.
+    // ----------------------------------------------------------------------------------------
+    // Source file containing global proc for main rig names:
+     source BS_listNodeNames;
+     source BS_iconCreator;
+    // proc to load data from arrays
+     string $moreFkRigNodes[] = BS_listNodeNames ("moreFkRigNodes");
+     string $mainBindJoints[] = BS_listNodeNames ("mainBindJoints");
+     string $moreBindJoints[] = BS_listNodeNames ("moreBindJoints");
+     string $controlGroups[] = BS_listNodeNames ("controlGroups");
+     string $iconNames[] = BS_listNodeNames ("iconNames");
+    // ----------------------------------------------------------------------------------------
+    // Source file containing global proc for rig skeletons:
+     source BS_skelCreator;
+    // ----------------------------------------------------------------------------------------
+    // common vars
+     string $printSkelNames = "Extra skeletons created with names: ";
+     string $pfx0 = "ct";
+     string $pfx1 = "lf";
+     string $pfx2 = "rt";
+     string $sfxPoly = "_polySkel";
+     string $sfxFkRig = "_fkRig";
+     string $sfxGroup = "_controlGroup";
+     string $sfxIk = "_rpIkHandle";
+    // ----------------------------------------------------------------------------------------
+    // Create Skeletons at the elbows:
+    // get positional data for left Elbow joints
+     float $jtP0[] = `xform -q -t -ws $intRigNodes[126]`;
+     string $name = ($pfx1 + $moreFkRigNodes[2] + $sfxFkRig);
+     float $jtP1[] = `xform -q -t -ws $name`;
+     matrix $lfElbowPos[2][3] = << $jtP0[0], $jtP0[1], $jtP0[2];
+                                  $jtP1[0], $jtP1[1], $jtP1[2] >>;
+    // run proc to create left Elbow Skeleton:
+     string $lfElbowSkel[] = BS_skelCreator ($lfElbowPos,$pfx1,$moreBindJoints[7],2,"yup",0,1);
+    // mirror Skeleton to create right Elbow skeleton
+     string $rtElbowSkel[] = BS_mirrorSkels ($lfElbowSkel[0],0);
+    // print names of Elbow joints
+    //print ($printSkelNames + " " + $lfElbowSkel + "\n");
+     print $printSkelNames; print $lfElbowSkel; print " \n";
+     print $printSkelNames; print $rtElbowSkel; print " \n";
+    // Create group node pads & parent under main joints
+     string $lfElbowPads[] = BS_doubleGrouper($pfx1,"ElbowPad",$intRigNodes[128]);
+     string $rtElbowPads[] = BS_doubleGrouper($pfx2,"ElbowPad",$intRigNodes[208]);
+    // Move groups to root joint position:
+     string $moveTemp[] = {$lfElbowPads[0]};
+     BS_nodeMover ($lfElbowSkel[0],$moveTemp,1,1);
+     string $moveTemp[] = {$rtElbowPads[0]};
+     BS_nodeMover ($rtElbowSkel[0],$moveTemp,1,1);
+    // Parent the root joint under the group nodes:
+     parent $lfElbowSkel[0] $lfElbowPads[1];
+     parent $rtElbowSkel[0] $rtElbowPads[1];
+    // ----------------------------------------------
+    // get positional data for left Knee joints
+     float $jtP0[] = `xform -q -t -ws $intRigNodes[27]`;
+     string $name = ($pfx1 + $moreFkRigNodes[3] + $sfxFkRig);
+     float $jtP1[] = `xform -q -t -ws $name`;
+     matrix $lfKneePos[2][3] = << $jtP0[0], $jtP0[1], $jtP0[2];
+                                  $jtP1[0], $jtP1[1], $jtP1[2] >>;
+    // run proc to create left Knee Skeleton:
+     string $lfKneeSkel[] = BS_skelCreator ($lfKneePos,$pfx1,$moreBindJoints[8],2,"yup",0,1);
+    // mirror Skeleton to create right Knee skeleton
+     string $rtKneeSkel[] = BS_mirrorSkels ($lfKneeSkel[0],0);
+    // print names of Knee joints
+    // print ($printSkelNames + " " + $lfKneeSkel + " \n");
+     print $printSkelNames; print $lfKneeSkel; print " \n";
+     print $printSkelNames; print $rtKneeSkel; print " \n";
+    // Create group node pads & parent under main joints
+     string $lfKneePads[] = BS_doubleGrouper($pfx1,"KneePad",$intRigNodes[29]);
+     string $rtKneePads[] = BS_doubleGrouper($pfx2,"KneePad",$intRigNodes[35]);
+    // Move groups to root joint position:
+     string $moveTemp[] = {$lfKneePads[0]};
+     BS_nodeMover ($lfKneeSkel[0],$moveTemp,1,1);
+     string $moveTemp[] = {$rtKneePads[0]};
+     BS_nodeMover ($rtKneeSkel[0],$moveTemp,1,1);
+    // Parent the root joint under the group nodes:
+     parent $lfKneeSkel[0] $lfKneePads[1];
+     parent $rtKneeSkel[0] $rtKneePads[1];
+    // ----------------------------------------------------------------------------------------
+    // Create skeletons in stomach and sides
+    // ----------------------------------------------
+    // Create skeletons in sides
+    // get positional data for left Side joints
+     float $jtP0[] = `xform -q -t -ws $intRigNodes[29]`;
+     string $name = ($pfx0 + $moreFkRigNodes[12] + $sfxFkRig);
+     float $jtP1[] = `pointPosition ($name + ".cv[7]")`;
+     matrix $lfSidePos[2][3] = << $jtP0[0], $jtP0[1], $jtP0[2];
+                                  $jtP1[0], $jtP1[1], $jtP1[2] >>;
+    // run proc to create left Side Skeleton:
+     string $lfSideSkel[] = BS_skelCreator ($lfSidePos,$pfx1,$moreBindJoints[0],2,"yup",0,1);
+    // mirror Skeleton to create right Side skeleton
+     string $rtSideSkel[] = BS_mirrorSkels ($lfSideSkel[0],0);
+    // print names of Side joints
+    // print ($printSkelNames + " " + $lfSideSkel + " \n");
+     print $printSkelNames; print $lfSideSkel; print " \n";
+     print $printSkelNames; print $rtSideSkel; print " \n";
+    // Create group node pads & parent under main joints
+     string $lfSidePads[] = BS_doubleGrouper($pfx1,"SidePad",$intRigNodes[294]);
+     string $rtSidePads[] = BS_doubleGrouper($pfx2,"SidePad",$intRigNodes[294]);
+    // Move groups to root joint position:
+     string $moveTemp[] = {$lfSidePads[0]};
+     BS_nodeMover ($lfSideSkel[0],$moveTemp,1,1);
+     string $moveTemp[] = {$rtSidePads[0]};
+     BS_nodeMover ($rtSideSkel[0],$moveTemp,1,1);
+    // Parent the root joint under the group nodes:
+     parent $lfSideSkel[0] $lfSidePads[1];
+     parent $rtSideSkel[0] $rtSidePads[1];
+    // ----------------------------------------------
+    // Create skeletons in chest and around the ribs:
+    // get positional data for left Rib joints
+     float $jtP0[] = `xform -q -t -ws $intRigNodes[282]`;
+     float $jtP1[] = `pointPosition ($intRigNodes[278] + ".vtx[60]")`;
+     float $jtP2[] = `pointPosition ($intRigNodes[278] + ".vtx[63]")`;
+     float $jtP3[] = `pointPosition ($intRigNodes[278] + ".vtx[65]")`;
+     matrix $lfRibPos[4][3] = << $jtP0[0], $jtP0[1], $jtP0[2];
+                                  $jtP1[0], $jtP1[1], $jtP1[2];
+                                  $jtP2[0], $jtP2[1], $jtP2[2];
+                                  $jtP3[0], $jtP3[1], $jtP3[2] >>;
+    // run proc to create left Rib Skeleton:
+     string $lfRibSkel[] = BS_skelCreator ($lfRibPos,$pfx1,$moreBindJoints[2],4,"yup",0,1);
+    // mirror Skeleton to create right Rib skeleton
+     string $rtRibSkel[] = BS_mirrorSkels ($lfRibSkel[0],0);
+    // print names of Rib joints
+    // print ($printSkelNames + " " + $lfRibSkel + " \n");
+     print $printSkelNames; print $lfRibSkel; print " \n";
+     print $printSkelNames; print $rtRibSkel; print " \n";
+    // Create group node pads & parent under main joints
+     string $lfRibPads[] = BS_doubleGrouper($pfx1,"RibPad",$intRigNodes[282]);
+     string $rtRibPads[] = BS_doubleGrouper($pfx2,"RibPad",$intRigNodes[282]);
+    // Move groups to root joint position:
+     string $moveTemp[] = {$lfRibPads[0]};
+     BS_nodeMover ($lfRibSkel[0],$moveTemp,1,1);
+     string $moveTemp[] = {$rtRibPads[0]};
+     BS_nodeMover ($rtRibSkel[0],$moveTemp,1,1);
+    // Parent the root joint under the group nodes:
+     parent $lfRibSkel[0] $lfRibPads[1];
+     parent $rtRibSkel[0] $rtRibPads[1];
+    // ----------------------------------------------
+    // get positional data for left Breath joints
+     float $jtP0[] = `pointPosition ($intRigNodes[277] + ".vtx[15]")`;
+     string $name = ($pfx0 + $moreFkRigNodes[13] + $sfxFkRig);
+     float $jtP1[] = `pointPosition ($name + ".cv[4]")`;
+     matrix $lfBreathPos[2][3] = << $jtP0[0], $jtP0[1], $jtP0[2];
+                                    $jtP1[0], $jtP1[1], $jtP1[2] >>;
+    // run proc to create left Breath Skeleton:
+     string $lfBreathSkel[] = BS_skelCreator ($lfBreathPos,$pfx1,$moreBindJoints[4],2,"yup",0,0);
+    // mirror Skeleton to create right Breath skeleton
+     string $rtBreathSkel[] = BS_mirrorSkels ($lfBreathSkel[0],0);
+    // print names of Breath joints
+    // print ($printSkelNames + " " + $lfBreathSkel + " \n");
+     print $printSkelNames; print $lfBreathSkel; print " \n";
+     print $printSkelNames; print $rtBreathSkel; print " \n";
+    // Create group node pads & parent under main joints
+     string $lfBreathPads[] = BS_doubleGrouper($pfx1,"BreathPad",$intRigNodes[282]);
+     string $rtBreathPads[] = BS_doubleGrouper($pfx2,"BreathPad",$intRigNodes[282]);
+    // Move groups to root joint position:
+     string $moveTemp[] = {$lfBreathPads[0]};
+     BS_nodeMover ($lfBreathSkel[0],$moveTemp,1,1);
+     string $moveTemp[] = {$rtBreathPads[0]};
+     BS_nodeMover ($rtBreathSkel[0],$moveTemp,1,1);
+    // Parent the root joint under the group nodes:
+     parent $lfBreathSkel[0] $lfBreathPads[1];
+     parent $rtBreathSkel[0] $rtBreathPads[1];
+    // rename for binding
+     rename $lfBreathSkel[0] "$lfBreath_infObj";
+     rename $rtBreathSkel[0] "$rtBreath_infObj";
+    // ----------------------------------------------
+    // get positional data for left Armpit joints
+     float $jtP0[] = `pointPosition ($intRigNodes[274] + ".vtx[15]")`;
+     string $name = ($pfx0 + $moreFkRigNodes[13] + $sfxFkRig);
+     float $jtP1[] = `pointPosition ($name + ".cv[3]")`;
+     matrix $lfArmpitPos[2][3] = << $jtP0[0], $jtP0[1], $jtP0[2];
+                                    $jtP1[0], $jtP1[1], $jtP1[2] >>;
+    // run proc to create left Armpit Skeleton:
+     string $lfArmpitSkel[] = BS_skelCreator ($lfArmpitPos,$pfx1,$moreBindJoints[10],2,"yup",0,1);
+    // mirror Skeleton to create right Armpit skeleton
+     string $rtArmpitSkel[] = BS_mirrorSkels ($lfArmpitSkel[0],0);
+    // print names of Armpit joints
+     print $printSkelNames; print $lfArmpitSkel; print " \n";
+     print $printSkelNames; print $rtArmpitSkel; print " \n";
+    // Create group node pads & parent under main joints
+     string $lfArmpitPads[] = BS_doubleGrouper($pfx1,"ArmpitPad",$intRigNodes[282]);
+     string $rtArmpitPads[] = BS_doubleGrouper($pfx2,"ArmpitPad",$intRigNodes[282]);
+    // Move groups to root joint position:
+     string $moveTemp[] = {$lfArmpitPads[0]};
+     BS_nodeMover ($lfArmpitSkel[0],$moveTemp,1,1);
+     string $moveTemp[] = {$rtArmpitPads[0]};
+     BS_nodeMover ($rtArmpitSkel[0],$moveTemp,1,1);
+    // Parent the root joint under the group nodes:
+     parent $lfArmpitSkel[0] $lfArmpitPads[1];
+     parent $rtArmpitSkel[0] $rtArmpitPads[1];
+    // ----------------------------------------------
+    // create skeletons aroun skull and jaw
+    // get positional data for Jaw joints
+     float $jtP0[] = `pointPosition ($intRigNodes[229] + ".vtx[21]")`;
+     float $jtP1[] = `pointPosition ($intRigNodes[229] + ".vtx[24]")`;
+     float $jtP2[] = `pointPosition ($intRigNodes[229] + ".vtx[62]")`;
+     float $jtP3[] = `pointPosition ($intRigNodes[229] + ".vtx[48]")`;
+     float $jtP4[] = `pointPosition ($intRigNodes[229] + ".vtx[1]")`;
+     matrix $lfJawPos[5][3] = << $jtP0[0], $jtP0[1], $jtP0[2];
+                                 $jtP1[0], $jtP1[1], $jtP1[2];
+                                 $jtP2[0], $jtP2[1], $jtP2[2];
+                                 $jtP3[0], $jtP3[1], $jtP3[2];
+                                 $jtP4[0], $jtP4[1], $jtP4[2] >>;
+    // run proc to create left Jaw Skeleton:
+     string $lfJawSkel[] = BS_skelCreator ($lfJawPos,$pfx1,$mainBindJoints[6],5,"yup",0,1);
+    // mirror Skeleton to create right Jaw skeleton
+     string $rtJawSkel[] = BS_mirrorSkels ($lfJawSkel[0],0);
+    // print names of Jaw joints
+     print $printSkelNames; print $lfJawSkel; print " \n";
+     print $printSkelNames; print $rtJawSkel; print " \n";
+    // Create group node pads & parent under main joints
+     string $lfJawPads[] = BS_doubleGrouper($pfx1,"JawPad",$intRigNodes[230]);
+     string $rtJawPads[] = BS_doubleGrouper($pfx2,"JawPad",$intRigNodes[230]);
+    // Move groups to root joint position:
+     string $moveTemp[] = {$lfJawPads[0]};
+     BS_nodeMover ($lfJawSkel[0],$moveTemp,1,1);
+     string $moveTemp[] = {$rtJawPads[0]};
+     BS_nodeMover ($rtJawSkel[0],$moveTemp,1,1);
+    // Parent the root joint under the group nodes:
+     parent $lfJawSkel[0] $lfJawPads[1];
+     parent $rtJawSkel[0] $rtJawPads[1];
+    // ----------------------------------------------
+    // get positional data for left skull joints
+     float $jtP0[] = `pointPosition ($intRigNodes[214] + ".vtx[288]")`;
+     float $jtP1[] = `pointPosition ($intRigNodes[214] + ".vtx[237]")`;
+     float $jtP2[] = `pointPosition ($intRigNodes[214] + ".vtx[100]")`;
+     float $jtP3[] = `pointPosition ($intRigNodes[214] + ".vtx[120]")`;
+     matrix $lfSkullPos[4][3] = << $jtP0[0], $jtP0[1], $jtP0[2];
+                                   $jtP1[0], $jtP1[1], $jtP1[2];
+                                   $jtP2[0], $jtP2[1], $jtP2[2];
+                                   $jtP3[0], $jtP3[1], $jtP3[2] >>;
+    // run proc to create left Skull Skeleton:
+     string $lfSkullSkel[] = BS_skelCreator ($lfSkullPos,$pfx1,$moreBindJoints[11],4,"yup",0,1);
+    // mirror Skeleton to create right Skull skeleton
+     string $rtSkullSkel[] = BS_mirrorSkels ($lfSkullSkel[0],0);
+    // print names of Skull joints
+     print $printSkelNames; print $lfSkullSkel; print " \n";
+     print $printSkelNames; print $rtSkullSkel; print " \n";
+    // Create group node pads & parent under main joints
+     string $lfSkullPads[] = BS_doubleGrouper($pfx1,"SkullPad",$intRigNodes[226]);
+     string $rtSkullPads[] = BS_doubleGrouper($pfx2,"SkullPad",$intRigNodes[226]);
+    // Move groups to root joint position:
+     string $moveTemp[] = {$lfSkullPads[0]};
+     BS_nodeMover ($lfSkullSkel[0],$moveTemp,1,1);
+     string $moveTemp[] = {$rtSkullPads[0]};
+     BS_nodeMover ($rtSkullSkel[0],$moveTemp,1,1);
+    // Parent the root joint under the group nodes:
+     parent $lfSkullSkel[0] $lfSkullPads[1];
+     parent $rtSkullSkel[0] $rtSkullPads[1];
+    // ----------------------------------------------
+    // Add a footroll setup for both feet
+    // Add two IK handles to left foot skel
+     string $lfHeelIk[] = `ikHandle -s 0 -sol "ikRPsolver"
+             -n ($pfx1 + $controlGroups[15] + $sfxIk)
+             -sj $intRigNodes[4] -ee $intRigNodes[2]`;
+     string $lfFootIk[] = `ikHandle -s 0 -sol "ikRPsolver"
+             -n ($pfx1 + $controlGroups[16] + $sfxIk)
+             -sj $intRigNodes[2] -ee $intRigNodes[0]`;
+    // create a locator for heel pivot
+     string $tmpCluster[] = `cluster ($intRigNodes[3] + ".vtx[27]")`;
+     string $name = ($pfx1 + $controlGroups[15] + $sfxGroup);
+     string $lfHeelPiv[] = `spaceLocator -n $name`;
+     string $moveTemp[] = {$lfHeelPiv[0]};
+     BS_nodeMover ($tmpCluster[1],$moveTemp,1,1);
+     delete $tmpCluster[0] $tmpCluster[1];
+    // create a locator for left foot pivot
+     string $name = ($pfx1 + $controlGroups[16] + $sfxGroup);
+     string $lfFootPiv[] = `spaceLocator -n $name`;
+     string $moveTemp[] = {$lfFootPiv[0]};
+     BS_nodeMover ($intRigNodes[2],$moveTemp,1,1);
+    // create a locator for left Toe pivot
+     string $name = ($pfx1 + $controlGroups[17] + $sfxGroup);
+     string $lfToePiv[] = `spaceLocator -n $name`;
+     string $moveTemp[] = {$lfToePiv[0]};
+     BS_nodeMover ($intRigNodes[0],$moveTemp,1,1);
+    // Parent the left footroll nodes into a hierarchy
+     string $childrenTemp[] = {$lfHeelPiv[0]};
+     BS_rigParentor ($intRigNodes[8],$childrenTemp,1);
+     string $childrenTemp[] = {$lfToePiv[0]};
+     BS_rigParentor ($lfHeelPiv[0],$childrenTemp,1);
+     string $childrenTemp[] = {$lfFootPiv[0]};
+     BS_rigParentor ($lfToePiv[0],$childrenTemp,1);
+    // Note do not freeze the ik skeleton
+     string $childrenTemp[] = {$lfHeelIk[0],$lfFootIk[0]};
+     BS_rigParentor ($lfToePiv[0],$childrenTemp,0);
+     string $childrenTemp[] = {$intRigNodes[7],$intRigNodes[4]};
+     BS_rigParentor ($lfFootPiv[0],$childrenTemp,0);
+    // Add two Ik handle to right foot skeleton
+     string $rtHeelIk[] = `ikHandle -s 0 -sol "ikRPsolver"
+             -n ($pfx2 + $controlGroups[15] + $sfxIk)
+             -sj $intRigNodes[13] -ee $intRigNodes[11]`;
+     string $rtFootIk[] = `ikHandle -s 0 -sol "ikRPsolver"
+             -n ($pfx2 + $controlGroups[16] + $sfxIk)
+             -sj $intRigNodes[11] -ee $intRigNodes[9]`;
+    // create a locator for heel pivot
+     string $tmpCluster[] = `cluster ($intRigNodes[12] + ".vtx[27]")`;
+     string $name = ($pfx2 + $controlGroups[15] + $sfxGroup);
+     string $rtHeelPiv[] = `spaceLocator -n $name`;
+     string $moveTemp[] = {$rtHeelPiv[0]};
+     BS_nodeMover ($tmpCluster[1],$moveTemp,1,1);
+     delete $tmpCluster[0] $tmpCluster[1];
+    // create a locator for left foot pivot
+     string $name = ($pfx2 + $controlGroups[16] + $sfxGroup);
+     string $rtFootPiv[] = `spaceLocator -n $name`;
+     string $moveTemp[] = {$rtFootPiv[0]};
+     BS_nodeMover ($intRigNodes[11],$moveTemp,1,1);
+    // create a locator for left Toe pivot
+     string $name = ($pfx2 + $controlGroups[17] + $sfxGroup);
+     string $rtToePiv[] = `spaceLocator -n $name`;
+     string $moveTemp[] = {$rtToePiv[0]};
+     BS_nodeMover ($intRigNodes[9],$moveTemp,1,1);
+    // Parent the left footroll nodes into a hierarchy
+     string $childrenTemp[] = {$rtHeelPiv[0]};
+     BS_rigParentor ($intRigNodes[17],$childrenTemp,1);
+     string $childrenTemp[] = {$rtToePiv[0]};
+     BS_rigParentor ($rtHeelPiv[0],$childrenTemp,1);
+     string $childrenTemp[] = {$rtFootPiv[0]};
+     BS_rigParentor ($rtToePiv[0],$childrenTemp,1);
+    // Note do not freeze the ik skeleton
+     string $childrenTemp[] = {$rtHeelIk[0],$rtFootIk[0]};
+     BS_rigParentor ($rtToePiv[0],$childrenTemp,0);
+     string $childrenTemp[] = {$intRigNodes[16],$intRigNodes[13]};
+     BS_rigParentor ($rtFootPiv[0],$childrenTemp,0);
+    // Add point constraint to link foot roots with leg ends  !is line 511 lfFoot or ltFoot?
+     pointConstraint -n "lfFoot_ptConstraint" -mo -weigt 1
+                                   $intRigNodes[24] $intRigNodes[4];
+     pointConstraint -n "rtFoot_ptConstraint" -mo -weigt 1
+                                   $intRigNodes[30] $intRigNodes[13];
+     print "Advanced foot roll setup created!\n";
+    // ----------------------------------------------------------------------------------------
+    // Create a spline Ik backbone
+    // list all poly vertabrae, and place names in an array
+     string $vertabrae[] = `ls($nSpace + ":ctVertabrae*_polySkel")`;
+    // get pos data for midBack
+     float $jtPM[];
+     int $i;
+     for ($i = 2; $i < 16; $i++)
+     {
+       float $jtPMConvert[] = `pointPosition ($vertabrae[$i] + ".vtx[24]")`;
+       $jtPM[size($jtPM)] = $jtPMConvert[0];
+       $jtPM[size($jtPM)] = $jtPMConvert[1];
+       $jtPM[size($jtPM)] = $jtPMConvert[2];
+     } // close loop
+     matrix $midBackPos[14][3] = << $jtPM[0],$jtPM[1],$jtPM[2];
+                                    $jtPM[3],$jtPM[4],$jtPM[5];
+                                    $jtPM[6],$jtPM[7],$jtPM[8];
+                                    $jtPM[9],$jtPM[10],$jtPM[11];
+                                    $jtPM[12],$jtPM[13],$jtPM[14];
+                                    $jtPM[15],$jtPM[16],$jtPM[17];
+                                    $jtPM[18],$jtPM[19],$jtPM[20];
+                                    $jtPM[21],$jtPM[22],$jtPM[23];
+                                    $jtPM[24],$jtPM[25],$jtPM[26];
+                                    $jtPM[27],$jtPM[28],$jtPM[29];
+                                    $jtPM[30],$jtPM[31],$jtPM[32];
+                                    $jtPM[33],$jtPM[34],$jtPM[35];
+                                    $jtPM[36],$jtPM[37],$jtPM[38];
+                                    $jtPM[39],$jtPM[40],$jtPM[41] >>;
+    // Run proc to create backbone
+     string $midBackSkel[] = BS_skelCreator
+                  ($midBackPos,$pfx0,$mainBindJoints[16],14,"xdown",0,1);
+    // get pos data for upBack joints
+     float $jtPU[];
+     int $i;
+     for ($i = 15; $i < 22; $i++)
+     {
+       float $jtPUConvert[] = `pointPosition ($vertabrae[$i] + ".vtx[24]")`;
+       $jtPU[size($jtPU)] = $jtPUConvert[0];
+       $jtPU[size($jtPU)] = $jtPUConvert[1];
+       $jtPU[size($jtPU)] = $jtPUConvert[2];
+     } // close loop
+     float $jtPUConvert[] = `pointPosition ($vertabrae[21] + ".vtx[25]")`;
+     $jtPU[size($jtPU)] = $jtPUConvert[0];
+     $jtPU[size($jtPU)] = $jtPUConvert[1];
+     $jtPU[size($jtPU)] = $jtPUConvert[2];
+     matrix $upBackPos[8][3] = << $jtPU[0],$jtPU[1],$jtPU[2];
+                                  $jtPU[3],$jtPU[4],$jtPU[5];
+                                  $jtPU[6],$jtPU[7],$jtPU[8];
+                                  $jtPU[9],$jtPU[10],$jtPU[11];
+                                  $jtPU[12],$jtPU[13],$jtPU[14];
+                                  $jtPU[15],$jtPU[16],$jtPU[17];
+                                  $jtPU[18],$jtPU[19],$jtPU[20];
+                                  $jtPU[21],$jtPU[22],$jtPU[23] >>;
+    // Run proc
+     string $upBackSkel[] = BS_skelCreator
+                  ($upBackPos,$pfx0,$mainBindJoints[17],8,"xdown",0,1);
+    // get pos data for lowBack joints
+     float $jtP0[] = `pointPosition ($vertabrae[1] + ".vtx[25]")`;
+     float $jtP1[] = `pointPosition ($vertabrae[0] + ".vtx[25]")`;
+     float $jtP2[] = `pointPosition ($vertabrae[0] + ".vtx[24]")`;
+     float $jtP3[] = `pointPosition ( $intRigNodes[19] + ".vtx[16]")`;
+     matrix $lowBackPos[4][3] = << $jtP0[0], $jtP0[1], $jtP0[2];
+                                   $jtP1[0], $jtP1[1], $jtP1[2];
+                                   $jtP2[0], $jtP2[1], $jtP2[2];
+                                   $jtP3[0], $jtP3[1], $jtP3[2] >>;
+    // run proc to create lowback skeleton
+     string $lowBackSkel[] = BS_skelCreator
+                  ($lowBackPos,$pfx0,$mainBindJoints[18],4,"xup",0,1);
+    // create main name strings and suffixes
+     string $midName = ($pfx0 + $mainBindJoints[16]);
+     string $upName = ($pfx0 + $mainBindJoints[17]);
+     string $lowName = ($pfx0 + $mainBindJoints[18]);
+     string $sfxHandle = "_spIkHandle";
+     string $sfxCurve = "_spIkCurve";
+     string $sfxCluster = "_spIkCluster";
+    // Add spline Ik to three backbone skeletons
+     string $midBackIK[] = `ikHandle -n ($midName + $sfxHandle)
+            -sol "ikSplineSolver" -pcv 0 -sj $midBackSkel[0] -ee $midBackSkel[1]`;
+     string $upBackIK[] = `ikHandle -n ($upName + $sfxHandle)
+            -sol "ikSplineSolver" -pcv 0 -sj $upBackSkel[0] -ee $upBackSkel[1]`;
+     string $lowBackIK[] = `ikHandle -n ($lowName + $sfxHandle)
+            -sol "ikSplineSolver" -pcv 0 -sj $lowBackSkel[0] -ee $lowBackSkel[1]`;
+    //rename the spline ik curves
+     string $midBackCurve = `rename $midBackIK[2] ($midName + $sfxCurve)`;
+     string $upBackCurve = `rename $upBackIK[2] ($upName + $sfxCurve)`;
+     string $lowBackCurve = `rename $lowBackIK[2] ($lowName + $sfxCurve)`;
+    // Create clusters on each point of the curves
+     string $midBackCluster[];
+     string $upBackCluster[];
+     string $lowBackCluster[];
+     int $i;
+     for ($i = 0; $i < 4; $i++)
+     {
+       string $tmpMidCluster[] = `cluster -n ($midName + $i + $sfxCluster)
+                                   ($midBackCurve + ".cv[" + $i + "]")`;
+       string $tmpUpCluster[] = `cluster -n ($upName + $i + $sfxCluster)
+                                   ($upBackCurve + ".cv[" + $i + "]")`;
+       string $tmpLowCluster[] = `cluster -n ($lowName + $i + $sfxCluster)
+                                   ($lowBackCurve + ".cv[" + $i + "]")`;
+       $midBackCluster[$i] = $tmpMidCluster[1];
+       $upBackCluster[$i] = $tmpUpCluster[1];
+       $lowBackCluster[$i] = $tmpLowCluster[1];
+     } // close loop
+    // create midback and upback box icons:
+    // get size data for midback icon
+     string $sizeVerts[] = {".cv[3]",".cv[7]",
+                            ".cv[5]",".cv[1]",
+                            ".cv[5]",".cv[1]"};
+     vector $scale = <<0.0,-0.4,1.5>>;
+    // run proc to get siza data
+     string $name = ($pfx0 + $moreFkRigNodes[12] + $sfxFkRig);
+     vector $iconSize = BS_getSize ($name,$sizeVerts,$scale);
+    // run proc create midback icon
+     string $ctMidBackIcon = BS_iconCreator("box",$pfx0,$iconNames[11],$iconSize,"none");
+    // run proc to move icon
+     string $moveTemp[] = {$ctMidBackIcon};
+     BS_nodeMover ($midBackCluster[0],$moveTemp,0,1);
+    // move verts
+     move -r -ls -wd 0.0 1.0 0.2 ($ctMidBackIcon + ".cv[0:16]");
+     delete -ch $ctMidBackIcon;
+    // create group nodes for midback icon
+     string $midBackGroups[] = BS_doubleGrouper($pfx0,$controlGroups[18],$intRigNodes[291]);
+    // move the midback groups to the midback icon position
+     string $moveTemp[] = {$midBackGroups[0]};
+     BS_nodeMover ($ctMidBackIcon,$moveTemp,0,1);
+    // parent midback icon under orignal back root position
+     string $childrenTemp[] = {$ctMidBackIcon};
+     BS_rigParentor ($midBackGroups[1],$childrenTemp,1);
+    // ----------------------------------------------
+    // get size data for upback icons
+     string $sizeVerts[] = {".cv[3]",".cv[7]",
+                            ".cv[5]",".cv[1]",
+                            ".cv[5]",".cv[1]"};
+     vector $scale = <<0.5,0.0,0.0>>;
+    // run proc to get size data for upback icon
+     string $name = ($pfx0 + $moreFkRigNodes[13] + $sfxFkRig);
+     vector $iconSize = BS_getSize ($name,$sizeVerts,$scale);
+    // run proc to create upback icon
+     string $ctUpBackIcon = BS_iconCreator("box",$pfx0,$iconNames[12],$iconSize,"none");
+    // run proc to move icon
+     string $moveTemp[] = {$ctUpBackIcon};
+     BS_nodeMover ($midBackCluster[1],$moveTemp,0,1);
+    // move verts
+     move -r -ls -wd 0.0 2.5 0.6 ($ctUpBackIcon + ".cv[0:16]");
+     string $tempCluster[] = `cluster ($ctUpBackIcon + ".cv[5:6]")
+                               ($ctUpBackIcon + ".cv[9:13]")($ctUpBackIcon + ".cv[16]")`;
+     move -r -ls -wd 0.0 0.0 0.5 $tempCluster[1];
+     scale -r 0.8 1.0 1.0 $tempCluster[1];
+     delete -ch $ctUpBackIcon;
+    // create group nodes for the Upback icon
+     string $upBackGroups[] = BS_doubleGrouper($pfx0,$controlGroups[19],$intRigNodes[282]);
+    // move the upback group to the upback icon positon
+     string $moveTemp[] = {$upBackGroups[0]};
+     BS_nodeMover ($ctUpBackIcon,$moveTemp,0,1);
+    // parent up back under original root
+     string $childrenTemp[] = {$ctUpBackIcon};
+     BS_rigParentor ($upBackGroups[1],$childrenTemp,1);
+    // ----------------------------------------------------------------------------------------
+    // Group the clusters under upback head and hips icons
+     group -n "ctMidBackClusters_group" -p $ctMidBackIcon $midBackCluster[0]
+                 $midBackCluster[1] $lowBackCluster[0] $lowBackCluster[1];
+     group -n "ctUpBackClusters_group" -p $ctUpBackIcon $midBackCluster[2]
+                 $midBackCluster[3] $upBackCluster[0] $upBackCluster[1];
+     group -n "ctHeadClusters_group" -p $intRigNodes[237] $upBackCluster[2] $upBackCluster[3];
+     group -n "ctHipsClusters_group" -p $intRigNodes[46] $lowBackCluster[2] $lowBackCluster[3];
+    // ----------------------------------------------------------------------------------------
+    //Group and parent the spline Ik node into the hierarchy
+     group -p  $intRigNodes[298] -n ($pfx0 + $controlGroups[20] + $sfxGroup)
+                $midBackSkel[0] $upBackSkel[0] $lowBackSkel[0];
+     group -p  $intRigNodes[298] -n ($pfx0 + $controlGroups[21] + $sfxGroup)
+                $midBackIK[0] $upBackIK[0] $lowBackIK[0]
+                $midBackCurve $upBackCurve $lowBackCurve;
+    // parent the lower back poly verts under new joints
+     parent $intRigNodes[19] $lowBackSkel[1];
+     string $childTmp[] = BS_getChildJoint ($lowBackSkel[0]);
+     parent $intRigNodes[20] $childTmp[0];
+     parent $intRigNodes[21] $lowBackSkel[0];
+     parent $intRigNodes[45] $lowBackSkel[1];
+    // parent mid poly verts & skels under new joints
+     parent $intRigNodes[289] $lfSidePads[0] $rtSidePads[0] $midBackSkel[0];
+     string $childTmp[] = BS_getChildJoint ($midBackSkel[0]);
+     parent $intRigNodes[288] $childTmp[0];
+     string $childTmp[] = BS_getChildJoint ($childTmp[0]);
+     parent $intRigNodes[285] $childTmp[0];
+     string $childTmp[] = BS_getChildJoint ($childTmp[0]);
+     parent $intRigNodes[283] $childTmp[0];
+     string $childTmp[] = BS_getChildJoint ($childTmp[0]);
+     parent $intRigNodes[284] $lfRibPads[0] $rtRibPads[0] $childTmp[0];
+     string $childTmp[] = BS_getChildJoint ($childTmp[0]);
+     parent $intRigNodes[278] $lfBreathPads[0] $rtBreathPads[0] $childTmp[0];
+     string $childTmp[] = BS_getChildJoint ($childTmp[0]);
+     parent $intRigNodes[277] $childTmp[0];
+     string $childTmp[] = BS_getChildJoint ($childTmp[0]);
+     parent $intRigNodes[273] $lfArmpitPads[0] $rtArmpitPads[0] $childTmp[0];
+     string $childTmp[] = BS_getChildJoint ($childTmp[0]);
+     parent $intRigNodes[274] $childTmp[0];
+     string $childTmp[] = BS_getChildJoint ($childTmp[0]);
+     parent $intRigNodes[275] $childTmp[0];
+     string $childTmp[] = BS_getChildJoint ($childTmp[0]);
+     parent $intRigNodes[276] $childTmp[0];
+     string $childTmp[] = BS_getChildJoint ($childTmp[0]);
+     parent $intRigNodes[279] $childTmp[0];
+     string $childTmp[] = BS_getChildJoint ($childTmp[0]);
+     parent $intRigNodes[280] $childTmp[0];
+     string $childTmp[] = BS_getChildJoint ($childTmp[0]);
+     parent $intRigNodes[271] $midBackSkel[1];
+    // parent the upper back poly verts under new joints
+     parent $intRigNodes[49] $upBackSkel[0];
+     string $childTmp[] = BS_getChildJoint ($upBackSkel[0]);
+     parent $intRigNodes[50] $childTmp[0];
+     string $childTmp[] = BS_getChildJoint ($childTmp[0]);
+     parent $intRigNodes[263] $childTmp[0];
+     string $childTmp[] = BS_getChildJoint ($childTmp[0]);
+     parent $intRigNodes[264] $childTmp[0];
+     string $childTmp[] = BS_getChildJoint ($childTmp[0]);
+     parent $intRigNodes[265] $childTmp[0];
+     string $childTmp[] = BS_getChildJoint ($childTmp[0]);
+     parent $intRigNodes[266] $childTmp[0];
+     string $childTmp[] = BS_getChildJoint ($childTmp[0]);
+     parent $intRigNodes[267] $childTmp[0];
+     print "Advanced spline Ik backbone setup created!\n";
+    // ----------------------------------------------------------------------------------------
+    // clear selection
+     select -cl;
+    // set namespace to root
+     namespace -set ":";
+     print ("Namespace has been set back to root (:) \n");
+    // List all node paths in the rig hierarchy:
+     string $advRigNodes[] = `listRelatives -ad -typ "transform" $topNode`;
+      /* start return array
+         end return array */
+    // return array of all the main skeleton nodes
+     return $advRigNodes;
+  } // close procedue
+  // *******************************************************************************************
+   print "global procedure BS_createAdvRig is now loaded into memory. \n";
+  // *******************************************************************************************
+  // Run all procs to create Advanced rig
+  // -------------------------------------------------------------------------------------------
+  print "Running all procs to create the Advanced BS biped rig! \n";
+  print "------------------------------------------------------\n";
+ // Run proc to create all nodes and parent them into a rig:
+  string $advRigNodes[] = BS_createAdvRig();
+  print "BS Advanced biped rig is created!\n";
+  print "------------------------------------------------------\n";
+  print "BS_createAdvRig proc returns the rig hierarchy:  \n";
+  print "******************************************************\n";
+ // -------------------------------------------------------------------------------------------
+ // Get the name of the rig from mayas enviroment:
+  string $rigName = `getenv "BS_RigName"`;
+  string $filePath = `getenv "BS_FilePath"`;
+ // Write return value to file:
+  string $basicRigFile = ($filePath + $rigName + "_advRig.rig");
+ // Write .rig file:
+  int $fileId = `fopen $basicRigFile "w"`;
+ // Use loop to print array positions and contents:
+  int $i;
+  for ($i = 0; $i < size($basicRigNodes); $i++)
+  { // open loop
+    // Print to cmd !Note removing namespacing for printing
+     string $buffer[];
+     tokenize $basicRigNodes[$i] ":" $buffer;
+     print ("[" + $i + "]" + $buffer[1] + "\n");
+    // Print to file:
+     fprint $fileId ($basicRigNodes[$i] + "\n");
+  } // close loop
+  fclose $fileId;
+ // Edit to enable & update the button and checkBox in GUI:
+  button -e -vis 0 "BS_connectRigButton";
+  button -e -en 1 -vis 1 -bgc 0.0 1.0 0.0 "BS_connectRigButton";
+  checkBox -e -en 1 "BS_autoConnectionsCheck";
+  checkBox -e -en 0 "BS_basicBindCheck";
+  checkBox -e -en 1 "BS_advBindCheck";
+  button -e -l "Done" -en 0 "BS_advancedRigButton!\n";
+ // *******************************************************************************************
+  print "------------------------------------------------------\n";
+  print "BS_createAdvRig scrpt done!\n";
+  print "******************************************************\n \n";
+  // EOF

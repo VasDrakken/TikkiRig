@@ -1,0 +1,361 @@
+/* ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+|   Script Name:    BS_createMainSkels.mel;
+|   Procs:          local BS_getPositions (string, string, string,);
+|                   local BS_mirrorSkels (string, int);
+|                   global BS_createMainSkels;
+|
+|   Other scripts sourced: BS_listNodeNames.mel & BS_skelCreator.mel
+|   Procs used in sourced scripts: BS_listNodeNames(string);
+|                           BS_skelCreator (matrix[][], string, string, int, string, int);
+|
+|   Notes:
+|    This script contains procedures that create the main skeleton for the basic rig. The
+|    return value is an aray of strings containing the names for all the joint nodes.
+|
+| ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ */
+
+ print "\n***********************************************************************\n";
+ print "initializing procedures\n";
+ print "-------------------------------------------------------------------------\n";
+
+ // Lcal Proc ised to joint position from world space:
+  proc float[] BS_getPositions (string $prefix, string $name, string $vertex)
+  { // Use conditional to query world space position or verticices:
+    float $xyzPos[];
+    if ($vertex == "no_vtx") $xyzPos = `xform -q -t -ws ($prefix + $name + "_fkRig")`;
+    else $xyzPos = `pointPosition ($prefix + $name + "_polySkel" + $vertex)`;
+
+   // return float array of the xyz postion:
+    return $xyzPos;
+  } // close procedure
+
+ print "local procedure BS_getPositions in now loadedinto memory. \n";
+ 
+//*****************************************************************************************
+ // Local procedure to mirror joints and catch names using list selection:
+  proc string[] BS_mirrorSkels (string $sourceSkel, int $ik)
+  {
+    string $mirrorSkelNames[];
+    if ($ik == 1)
+    { // Open if
+       mirrorJoint -myz -mb -sr "lf" "rt" $sourceSkel;
+      // list selected to store main joints names in the array:
+       string $mirrorIk[] = `ls -sl`;
+       pickWalk -d left;
+       select -hi;
+       string $mirrorJoints[] = `ls -sl`;
+       int $endJoint = size($mirrorJoints) - 2;
+       $mirrorSkelNames = {$mirrorJoints[0],$mirrorJoints[$endJoint],$mirrorIk[0]};
+      // Clear selection
+       select -cl;
+    } //close if
+    else
+    { //open else
+       mirrorJoint -myz -mb -sr "lf" "rt" $sourceSkel;
+      // List selected to store main joints names in the array:
+       select -hi;
+       string $mirrorJoints[] = `ls -sl`;
+       int $endJoint = size($mirrorJoints) - 1;
+       $mirrorSkelNames = {$mirrorJoints[0], $mirrorJoints[$endJoint]};
+      // clear selection
+       select -cl;
+    } // close else
+    return $mirrorSkelNames;
+  } // close procedure
+  
+  print "local procedure BS_mirrorSkels in now loaded into memory. \n";
+  
+//*****************************************************************************************
+ // Global procedure creates main skeleton's basic rig
+  global proc string[] BS_createMainSkels()
+  {
+    // source the file containing global proc for main rig names
+     source BS_listNodeNames.mel;
+    // Use procedures return value to load names in arrays:
+     string $fkRigNodes[] =  BS_listNodeNames("fkRigNodes");
+     string $moreFKRigNodes[] = BS_listNodeNames("moreFKRigNodes");
+     string $legPolySkels[] = BS_listNodeNames("legPolySkels");
+     string $torsoPolySkels[] = BS_listNodeNames("torsoPolySkels");
+     string $backPolySkels[] = BS_listNodeNames("backPolySkels");
+     string $armPolySkels[] = BS_listNodeNames("armPolySkels");
+     string $handPolySkels[] = BS_listNodeNames("handPolySkels");
+     string $mainBindJoints[] = BS_listNodeNames("mainBindJoints");
+     string $moreBindJoints[] = BS_listNodeNames("moreBindJoints");
+     string $controlJoints[] = BS_listNodeNames("controlJoints");
+     //string $[] =
+    // -------------------------------------------------------------------------
+    // source the file containing global proc for creating the rig skeletons
+     source BS_skelCreator.mel;
+    // -------------------------------------------------------------------------
+    // Often used strings:
+     string $printSkelNames = " skeleton created with names: \n";
+     string $pfx0 = "ct";
+     string $pfx1 = "lf";
+     string $pfx2 = "rt";
+     string $sfxPoly = "_polySkel";
+     string $sfxRig = "_fkRig";
+    // -------------------------------------------------------------------------
+    // Get position data for left foot joints:
+     float $jtP0[] = BS_getPositions ($pfx1, $fkRigNodes[3], "no_vtx");
+     float $jtP1[] = BS_getPositions ($pfx1, $fkRigNodes[4], "no_vtx");
+     float $jtP2[] = BS_getPositions ($pfx1, $fkRigNodes[5], "no_vtx");
+     matrix $lfFootPos[3][3] = << $jtP0[0], $jtP0[1], $jtP0[2];
+                                 $jtP1[0], $jtP1[1], $jtP1[2];
+                                 $jtP2[0], $jtP2[1], $jtP2[2]>>;
+    // Run proc to create left foot skeleton:
+     string $lfFootSkel[] =  BS_skelCreator ($lfFootPos, $pfx1, $mainBindJoints[0], 3, "yup", 0, 1);
+    // Mirror skeleton to create right foot:
+     string $rtFootSkel[] = BS_mirrorSkels ($lfFootSkel[0],0);
+    // Print names of main joints:
+     print ($pfx1 + $mainBindJoints[0] + $printSkelNames);
+     print $lfFootSkel; print " \n";
+     print ($pfx2 + $mainBindJoints[0] + $printSkelNames);
+     print $rtFootSkel; print " \n";
+    // ----------------------------------------------------------------------------
+    // Get position data for left leg joints:
+     float $jtP0[] = BS_getPositions ($pfx1, $fkRigNodes[1], "no_vtx");
+     float $jtP1[] = BS_getPositions ($pfx1, $fkRigNodes[2], "no_vtx");
+     float $jtP2[] = BS_getPositions ($pfx1, $fkRigNodes[3], "no_vtx");
+     matrix $lfLegPos[3][3] = << $jtP0[0], $jtP0[1], $jtP0[2];
+                                 $jtP1[0], $jtP1[1], $jtP1[2];
+                                 $jtP2[0], $jtP2[1], $jtP2[2]>>;
+    // Run proc to create left leg skeleton:
+     string $lfLegSkel[] =  BS_skelCreator ($lfLegPos,$pfx1,$mainBindJoints[1],3,"yup",1,1);
+    // Mirror skeleton to create right leg:
+     string $rtLegSkel[] = BS_mirrorSkels ($lfLegSkel[0],1);
+    // Print names of main joints:
+     print ($pfx1 + $mainBindJoints[1] + $printSkelNames);
+     print $lfLegSkel; print " \n";
+     print ($pfx2 + $mainBindJoints[1] + $printSkelNames);
+     print $rtLegSkel; print " \n";
+    // ----------------------------------------------------------------------------
+    // Get positional data for hip control joints:
+     float $jtP0[] = BS_getPositions ($pfx0, $fkRigNodes[0], "no_vtx");
+     float $jtP1[] = BS_getPositions ($pfx0, $torsoPolySkels[0], ".vtx[16]");
+     matrix $ctHipsPos[2][3] = << $jtP0[0], $jtP0[1], $jtP0[2];
+                                  $jtP1[0], $jtP1[1], $jtP1[2]>>;
+    // Run proc to create hip control skeleton:
+     string $ctHipsSkel[] =  BS_skelCreator ($ctHipsPos,$pfx0,$controlJoints[0],2,"xup",0,0);
+    // Print names of main joints:
+     print ($pfx0 + $controlJoints[0] + $printSkelNames);
+     print $ctHipsSkel; print " \n";
+    // ----------------------------------------------------------------------------
+    // Get position data for left hip joints:
+     float $jtP0[] = BS_getPositions ($pfx0, $fkRigNodes[0], "no_vtx");
+     float $jtP1[] = BS_getPositions ($pfx0, $torsoPolySkels[0], ".vtx[311]");
+     float $jtP2[] = BS_getPositions ($pfx0, $torsoPolySkels[0], ".vtx[327]");
+     float $jtP3[] = BS_getPositions ($pfx1, $legPolySkels[0], ".vtx[97]");
+     matrix $lfHipsPos[4][3] = << $jtP0[0], $jtP0[1], $jtP0[2];
+                                  $jtP1[0], $jtP1[1], $jtP1[2];
+                                  $jtP2[0], $jtP2[1], $jtP2[2];
+                                  $jtP3[0], $jtP3[1], $jtP3[2]>>;
+    // Run proc to create left hip skeleton:
+     string $lfHipsSkel[] =  BS_skelCreator ($lfHipsPos,$pfx1,$mainBindJoints[2],4,"xup",0,1);
+    // Mirror skeleton to create right leg:
+     string $rtHipsSkel[] = BS_mirrorSkels ($lfHipsSkel[0],0);
+    // Print names of main joints:
+     print ($pfx1 + $mainBindJoints[2] + $printSkelNames);
+     print $lfHipsSkel; print " \n";
+     print ($pfx2 + $mainBindJoints[2] + $printSkelNames);
+     print $rtHipsSkel; print " \n";
+    // ----------------------------------------------------------------------------
+    // Get position data for backbone control joints:
+     float $jtP0[] = BS_getPositions ($pfx0, $fkRigNodes[0], "no_vtx");
+     float $jtP1[] = BS_getPositions ($pfx0, $fkRigNodes[7], "no_vtx");
+     float $jtP2[] = BS_getPositions ($pfx0, $fkRigNodes[8], "no_vtx");
+     float $jtP3[] = BS_getPositions ($pfx0, $fkRigNodes[9], "no_vtx");
+     matrix $ctBackPos[4][3] = << $jtP0[0], $jtP0[1], $jtP0[2];
+                                  $jtP1[0], $jtP1[1], $jtP1[2];
+                                  $jtP2[0], $jtP2[1], $jtP2[2];
+                                  $jtP3[0], $jtP3[1], $jtP3[2]>>;
+    // Run proc to create backbone control skeleton:
+     string $ctBackSkel[] =  BS_skelCreator ($ctBackPos, $pfx0, $controlJoints[1], 4, "xdown", 0, 0);
+    // Print names of main joints:
+     print ($pfx0 + $controlJoints[1] + $printSkelNames);
+     print $ctBackSkel; print " \n";
+    // ----------------------------------------------------------------------------
+    // Get position data for neck control joints:
+     float $jtP0[] = BS_getPositions ($pfx0, $fkRigNodes[10], "no_vtx");
+     float $jtP1[] = BS_getPositions ($pfx0, $fkRigNodes[11], "no_vtx");
+     matrix $ctNeckPos[2][3] = << $jtP0[0], $jtP0[1], $jtP0[2];
+                                  $jtP1[0], $jtP1[1], $jtP1[2]>>;
+    // Run proc to create neck control skeleton:
+     string $ctNeckSkel[] =  BS_skelCreator ($ctNeckPos, $pfx0, $controlJoints[2], 2, "xdown", 0, 0);
+    // Print names of main joints:
+     print ($pfx0 + $controlJoints[2] + $printSkelNames);
+     print $ctNeckSkel; print " \n";
+    // ----------------------------------------------------------------------------
+    // Get position data for head joints:
+     float $jtP0[] = BS_getPositions ($pfx0, $fkRigNodes[11], "no_vtx");
+     float $jtP1[] = BS_getPositions ($pfx0, $fkRigNodes[12], "no_vtx");
+     matrix $ctHeadPos[2][3] = << $jtP0[0], $jtP0[1], $jtP0[2];
+                                  $jtP1[0], $jtP1[1], $jtP1[2] >>;
+    // Run proc to create head skeleton:
+     string $ctHeadSkel[] = BS_skelCreator ($ctHeadPos,$pfx0,$mainBindJoints[5],2,"xdown",0,1);
+    // Print names of main joints:
+     print ($pfx0 + $mainBindJoints[5] + $printSkelNames);
+     print $ctHeadSkel; print " \n";
+    // ----------------------------------------------------------------------------
+    // Create some clusters on the jaw poly bones and constrait a locator to them:
+     string $clusterTmp1[] = `cluster ($pfx0 + $torsoPolySkels[2] + $sfxPoly + ".vtx[153]")`;
+     string $clusterTmp2[] = `cluster ($pfx0 + $torsoPolySkels[2] + $sfxPoly + ".vtx[38]")`;
+     string $locTmp1[] = `spaceLocator`;
+     pointConstraint $clusterTmp1[1] $locTmp1[0];
+     pointConstraint $clusterTmp2[1] $locTmp1[0];
+     string $clusterTmp3[] = `cluster ($pfx0 + $torsoPolySkels[2] + $sfxPoly + ".vtx[139]")`;
+     string $clusterTmp4[] = `cluster ($pfx0 + $torsoPolySkels[2] + $sfxPoly + ".vtx[24]")`;
+     string $locTmp2[] = `spaceLocator`;
+     pointConstraint $clusterTmp3[1] $locTmp2[0];
+     pointConstraint $clusterTmp4[1] $locTmp2[0];
+    // Get position data for jaw joints:
+     float $jtP0[] = `xform -q -t -ws $locTmp1[0]`;
+     float $jtP1[] = `xform -q -t -ws $locTmp2[0]`;
+     float $jtP2[] =  BS_getPositions ($pfx0,$torsoPolySkels[2],".vtx[76]");
+     matrix $ctJawPos[3][3] = << $jtP0[0], $jtP0[1], $jtP0[2];
+                                 $jtP1[0], $jtP1[1], $jtP1[2];
+                                 $jtP2[0], $jtP2[1], $jtP2[2]>>;
+    // Run proc to create the jaw skeleton:
+     string $ctJawSkel[] = BS_skelCreator ($ctJawPos,$pfx0,$mainBindJoints[6],3,"yup",0,1);
+    // Print names of main joints:
+     print ($pfx0 + $mainBindJoints[6] + $printSkelNames);
+     print $ctJawSkel; print " \n";
+    // Delete temp clusters and locators:
+     delete $clusterTmp1[0] $clusterTmp2[0] $clusterTmp3[0] $clusterTmp4[0]
+            $locTmp1[0] $locTmp2[0];
+    // ----------------------------------------------------------------------------
+    // Get position data for left clavicle joints:
+     float $jtP0[] = BS_getPositions ($pfx1, $armPolySkels[0], ".vtx[24]");
+     float $jtP1[] = BS_getPositions ($pfx1, $armPolySkels[0], ".vtx[32]");
+     matrix $lfClaviclePos[2][3] = << $jtP0[0], $jtP0[1], $jtP0[2];
+                                      $jtP1[0], $jtP1[1], $jtP1[2]>>;
+    // Run proc to create left left clavicle skeleton:
+     string $lfClavicleSkel[] =  BS_skelCreator ($lfClaviclePos, $pfx1, $mainBindJoints[7], 2, "yup", 1, 1);
+    // Mirror skeleton to create right clavicle:
+     string $rtClavicleSkel[] = BS_mirrorSkels ($lfClavicleSkel[0], 1);
+    // Print names of main joints:
+     print ($pfx1 + $mainBindJoints[7] + $printSkelNames);
+     print $lfClavicleSkel; print " \n";
+     print ($pfx2 + $mainBindJoints[7] + $printSkelNames);
+     print $rtClavicleSkel; print " \n";
+    // ----------------------------------------------------------------------------
+    // Get position data for left scapula joints:
+     float $jtP0[] = BS_getPositions ($pfx1, $armPolySkels[1], ".vtx[25]");
+     float $jtP1[] = BS_getPositions ($pfx1, $armPolySkels[1], ".vtx[121]");
+     matrix $lfScapulaPos[2][3] = << $jtP0[0], $jtP0[1], $jtP0[2];
+                                     $jtP1[0], $jtP1[1], $jtP1[2]>>;
+    // Run proc to create left left scapula skeleton:
+     string $lfScapulaSkel[] =  BS_skelCreator ($lfScapulaPos, $pfx1, $mainBindJoints[8], 2, "yup", 1, 1);
+    // Mirror skeleton to create right clavicle:
+     string $rtScapulaSkel[] = BS_mirrorSkels ($lfScapulaSkel[0],1);
+    // Print names of main joints:
+     print ($pfx1 + $mainBindJoints[8] + $printSkelNames);
+     print $lfScapulaSkel; print " \n";
+     print ($pfx2 + $mainBindJoints[8] + $printSkelNames);
+     print $rtScapulaSkel; print " \n";
+    // ----------------------------------------------------------------------------
+    // Create a locator between the elbow and wrist with constraints:
+     string $locTmp[] = `spaceLocator`;
+     pointConstraint ($pfx1 + $fkRigNodes[15] + $sfxRig) $locTmp[0];
+     pointConstraint ($pfx1 + $fkRigNodes[16] + $sfxRig) $locTmp[0];
+    // Get position data for left arm joints:
+     float $jtP0[] = BS_getPositions ($pfx1, $fkRigNodes[14], "no_vtx");
+     float $jtP1[] = BS_getPositions ($pfx1, $fkRigNodes[15], "no_vtx");
+     float $jtP2[] = `xform -q -t -ws $locTmp[0]`;
+     float $jtP3[] = BS_getPositions ($pfx1, $fkRigNodes[16], "no_vtx");
+     matrix $lfArmPos[4][3] = << $jtP0[0], $jtP0[1], $jtP0[2];
+                                 $jtP1[0], $jtP1[1], $jtP1[2];
+                                 $jtP2[0], $jtP2[1], $jtP2[2];
+                                 $jtP3[0], $jtP3[1], $jtP3[2]>>;
+    // Run proc to create the left arm skeleton:
+     string $lfArmSkel[] = BS_skelCreator ($lfArmPos, $pfx1, $mainBindJoints[9], 4, "yup", 0, 1);
+    // Mirror skeleton to create right arm:
+     string $rtArmSkel[] = BS_mirrorSkels ($lfArmSkel[0], 0);
+    // Print names of main joints:
+     print ($pfx1 + $mainBindJoints[6] + $printSkelNames);
+     print $lfArmSkel; print " \n";
+    // Add IK from left shoulder to mid forearm:
+     string $IkName = "Arm_rpIkHandle";
+     select -r $lfArmSkel[1];
+     pickWalk -d up;
+     string $lfArmTurnJoint[] = `ls -sl`;
+     string $lfArmRpIk[] = `ikHandle -s 0 -sol "ikRPsolver" -n ($pfx1 + $IkName)
+                                          -sj $lfArmSkel[0] -ee $lfArmTurnJoint[0]`;
+    // move left ik effector pivot down to the left wrist:
+     xform -ws -t $jtP3[0] $jtP3[1] $jtP3[2] ($lfArmRpIk[1] + ".rotatePivot");
+    // Add IK from right shoulder to mid forearm:
+     select -r $rtArmSkel[1];
+     pickWalk -d up;
+     string $rtArmTurnJoint[] = `ls -sl`;
+     string $rtArmRpIk[] = `ikHandle -s 0 -sol "ikRPsolver" -n ($pfx2 + $IkName)
+                                          -sj $rtArmSkel[0] -ee $rtArmTurnJoint[0]`;
+    // move right ik effector pivot down to right wrist:
+     float $jtP3[] = BS_getPositions ($pfx2, $fkRigNodes[16], "no_vtx");
+     xform -ws -t $jtP3[0] $jtP3[1] $jtP3[2] ($rtArmRpIk[1] + ".rotatePivot");
+     select -cl;
+    // Print names of main joints:
+     print ($pfx1 + $mainBindJoints[9] + $printSkelNames);
+     print $lfArmSkel;
+     print ($lfArmRpIk[0] + "\n  \n");
+     print ($pfx2 + $mainBindJoints[9] + $printSkelNames);
+     print $rtArmSkel;
+     print ($rtArmRpIk[0] + "\n  \n");
+    // Delete the temp Locator:
+     delete $locTmp[0];
+    // ----------------------------------------------------------------------------
+    // Get position data for left hand joints:
+     float $jtP0[] = BS_getPositions ($pfx1, $fkRigNodes[16], "no_vtx");
+     float $jtP1[] = BS_getPositions ($pfx1, $fkRigNodes[17], "no_vtx");
+     matrix $lfHandPos[2][3] = << $jtP0[0], $jtP0[1], $jtP0[2];
+                                 $jtP1[0], $jtP1[1], $jtP1[2]>>;
+    // Run proc to create the left hand skeleton:
+     string $lfHandSkel[] = BS_skelCreator ($lfHandPos, $pfx1, $mainBindJoints[10], 2, "yup", 0, 1);
+    // Mirror skeleton to create right clavicle:
+     string $rtHandSkel[] = BS_mirrorSkels ($lfHandSkel[0], 0);
+    // Print names of main joints:
+     print ($pfx1 + $mainBindJoints[10] + $printSkelNames);
+     print $lfHandSkel; print " \n";
+     print ($pfx2 + $mainBindJoints[10] + $printSkelNames);
+     print $rtHandSkel; print " \n";
+    // ----------------------------------------------------------------------------
+    // Create array of all the main skeleton nodes:
+     string $skelNodeNames[] = {$lfFootSkel[0], $lfFootSkel[1],
+            $rtFootSkel[0], $rtFootSkel[1],
+            $lfLegSkel[0], $lfLegSkel[1], $lfLegSkel[2],
+            $rtLegSkel[0], $rtLegSkel[1], $rtLegSkel[2],
+            $ctHipsSkel[0], $ctHipsSkel[1],
+            $lfHipsSkel[0], $lfHipsSkel[1],
+            $rtHipsSkel[0], $rtHipsSkel[1],
+            $ctBackSkel[0], $ctBackSkel[1],
+            $ctNeckSkel[0], $ctNeckSkel[1],
+            $ctHeadSkel[0], $ctHeadSkel[1],
+            $ctJawSkel[0], $ctJawSkel[1],
+            $lfClavicleSkel[0], $lfClavicleSkel[1],$lfClavicleSkel[2],
+            $rtClavicleSkel[0], $rtClavicleSkel[1],$rtClavicleSkel[2],
+            $lfScapulaSkel[0], $lfScapulaSkel[1],$lfScapulaSkel[2],
+            $rtScapulaSkel[0], $rtScapulaSkel[1],$rtScapulaSkel[2],
+            $lfArmSkel[0], $lfArmSkel[1], $lfArmRpIk[0],
+            $rtArmSkel[0], $rtArmSkel[1], $rtArmRpIk[0],
+            $lfHandSkel[0], $lfHandSkel[1],
+            $rtHandSkel[0], $rtHandSkel[1]};
+     /* Start Block comment...
+        return array index:
+        End block comment */
+
+    // return array of all the main skeleton nodes created:
+     return $skelNodeNames;
+
+//*****************************************************************************************
+
+ print "global proc BS_mirrorSkels is now loaded into memory. \n";
+
+//*****************************************************************************************
+ print "------------------------------------------------------\n";
+
+ // BS_createMainSkels();
+ for ($i = 0; $i < size($skelNodeNames); $i++)
+  { // open loop
+     print ("[" + $i + "]" + $skelNodeNames[$i] + "\n");
+  }
+} // close procedure
+      // Print to file:
+  // EOF

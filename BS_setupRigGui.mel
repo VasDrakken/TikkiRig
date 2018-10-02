@@ -1,0 +1,124 @@
+/* ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+|   Script Name:    BS_setupRigGui.mel;
+|   Procs:          global BS_checkCharName ();
+|                   global BS_setCharName ();
+|                   global BS_setupRigGui ();
+|
+|   Notes:
+|    This script contains procedures that create a setup gui for running all the
+|     scripts that create and bind the CRI rig.
+|
+| ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ */
+
+  print " \n**************************************************************\n";
+  print "BS_setupRigGui script started!\n";
+  print "   --------------------------------------------------------------\n";
+
+// *******************************************************************************************
+  print "All setup Gui Procs are being loaded into memory... \n";
+
+// -------------------------------------------------------------------------------------------
+ // Global proc used for finding names of the characters:
+ global proc BS_checkCharName ()
+ { // Open Procedure... BS_checkCharName
+    string $skinName[] = `ls -sl`;
+    int $size = `size ($skinName)`;
+    if ($size < 1) text -e -l "Warning: Nothing selected!" "BS_guiWarning1";
+    else
+    { // Open Else...
+      string $buffer[];
+      tokenize $skinName[0] "_" $buffer;
+      textField -e -tx $buffer[0] -en 1 "BS_nameField";
+      putenv "BS_SkinName" $skinName[0];
+      // Edit to enable and update the button in the GUI:
+      button -e -vis 0 "BS_setCharacterButton";
+      button -e -en 1 -vis 1 -bgc 0.0 1.0  0.0 "BS_setCharacterButton";
+    } // Close Else
+  } // Close Procedure  BS_checkCharName
+     print "BS_setCharName global proc is now in Maya's memory.\n";
+// -------------------------------------------------------------------------------------------
+ // Global proc used for processing name of character:
+  global proc BS_setCharName ()
+  { // Open Procedure...  BS_setCharName
+     string $rigName = `textField -q -tx "BS_nameField"`;
+     string $filePath = `textField -q -tx "BS_pathField"`;
+     namespace -set ":";
+    // Creates the top group node of the rig hierarchy using argument:
+     string $topNode = `group -n ($rigName + "_topNode") -em`;
+     print ("basic rig top node has been created with the name: " + $topNode + "\n");
+     select -cl;
+    // Set name of top node and skin into enviroment:
+     putenv "BS_RigName" $rigName;
+     putenv "BS_TopNode" $topNode;
+     putenv "BS_FilePath" $filePath;
+    // Enable next button and edit previous button in GUI
+     button -e -vis 0 "BS_basicRigButton";
+     button -e -en 1 -vis 1 -bgc 0.0 1.0 0.0  "BS_basicRigButton";
+     button -e -l "Done" -en 0 "BS_setCharacterButton";
+  } // Close Procedure   BS_setCharName
+// -------------------------------------------------------------------------------------------
+// *******************************************************************************************
+ // Global proc to run setup Gui window:
+  global proc BS_setupRigGui ()
+  { // Open Procedure...
+    // Decalre unique GUI control names:
+     string $defaultPath = "D:\\Ben\\BS_RiggingFiles";
+     string $nameWin = "BS_setupGui";
+     string $pathField = "BS_pathField";
+     string $nameField = "BS_nameField";
+     string $warning1 = "BS_guiWarning1";
+     string $setCharButt = "BS_setCharacterButton";
+     string $basRigButt = "BS_basicRigButton";
+     string $intRigButt = "BS_intermRigButton";
+     string $advRigButt = "BS_advancedRigButton";
+    // --------------------------------------------------------------------------------------
+    // Create the setup Gui window:
+     if (`window -ex $nameWin`) deleteUI $nameWin;
+      window -t "Fast Rigging Window" $nameWin;
+      string $layout = `columnLayout -p $nameWin`;
+    // Create controls for creating the rig:
+     text -w 400 -p $layout -fn "smallBoldLabelFont" -al "left"
+          -l "1. Type in the pathway to your rig files:";
+     textField -w 300 -p $layout -tx $defaultPath $pathField;
+     text -w 400 -p $layout -fn "smallBoldLabelFont" -al "left"
+          -l "2a. Select the main skin node, then click button:";
+     button -w 300 -p $layout -l "Check name..." -c "BS_checkCharName";
+    // --------------------------------------------------------------------------------------
+     text -w 300 -p $layout -l " " $warning1;
+     text -w 400 -p $layout -fn "smallBoldLabelFont" -al "left"
+          -l "2b. Use the following name, or type in a new name";
+     textField -w 400 -p $layout -tx "Name of Character" -en 0 $nameField;
+     button -w 300 -p $layout -bgc 1.0 0.0 0.0 -en 0
+             -l "Name OK!" -c "BS_setCharName" $setCharButt;
+    // --------------------------------------------------------------------------------------
+     text -w 400 -p $layout -fn "smallBoldLabelFont" -al "left"
+          -l "3. Click the button to create the basic rig";
+     button -w 300 -p $layout -bgc 1.0 0.0 0.0 -en 0
+            -l "Create Basic Rig!" -c "source BS_createBasicRig" $basRigButt;
+    // --------------------------------------------------------------------------------------
+     text -w 400 -p $layout -fn "smallBoldLabelFont" -al "left"
+          -l "4. Click the button to create the basic rig";
+     button -w 300 -p $layout -bgc 1.0 0.0 0.0 -en 0
+            -l "Create Intermediate Basic Rig!" -c "source BS_createIntRig" $intRigButt;
+    // --------------------------------------------------------------------------------------
+     text -w 400 -p $layout -fn "smallBoldLabelFont" -al "left"
+          -l "5. Click the button to create the basic rig";
+     button -w 300 -p $layout -bgc 1.0 0.0 0.0 -en 0
+            -l "Create Advanced Rig!" -c "source BS_createAdvRig" $advRigButt;
+    // --------------------------------------------------------------------------------------
+     window -e -wh 350 550 -topLeftCorner 50 50 $nameWin;
+     showWindow $nameWin;
+  } // Close Procedure
+// *******************************************************************************************
+ print "BS_setupRigGui global proc is now in Maya's memory.\n";
+// *******************************************************************************************
+ print "-----------------------------------------------------------------------------\n";
+ print "Running all procs to create the rig setup GUI!\n";
+ print "-----------------------------------------------------------------------------\n";
+ // Run proc to create setup GUI for rig:
+ BS_setupRigGui;
+ print "-----------------------------------------------------------------------------\n";
+ print "BS_setupRigGui script done!\n";
+ print "-----------------------------------------------------------------------------\n";
+ print "*****************************************************************************\n \n";
+  // EOF
